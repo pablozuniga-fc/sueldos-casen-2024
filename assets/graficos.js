@@ -114,6 +114,7 @@
     (o.marcasX || []).forEach(function (m) { if (m.texto) niveles = Math.max(niveles, (m.nivel || 0) + 1); });
     var estrecho = W < 520;
     var mg = { l: o.y.sinEtiquetas ? 14 : 58, r: o.margenDer || 18, t: 10 + niveles * 18, b: o.x.titulo ? 46 : 28 };
+    if (o.margen) for (var km in o.margen) mg[km] = o.margen[km];
     var H = (o.alto || 300), pw = W - mg.l - mg.r, ph = H - mg.t - mg.b;
     var X = function (v) { return mg.l + (v - o.x.min) / (o.x.max - o.x.min) * pw; };
     var Y = function (v) { return mg.t + ph - (v - o.y.min) / (o.y.max - o.y.min) * ph; };
@@ -143,8 +144,16 @@
     // capas
     var series = [];
     o.capas.forEach(function (c) {
-      if (c.nombre) series.push({ nombre: c.nombre, color: c.color, forma: c.tipo === 'barras' ? 'caja' : 'linea' });
-      if (c.tipo === 'barras') {
+      if (c.nombre) series.push({ nombre: c.nombre, color: c.color, forma: (c.tipo === 'barras' || c.tipo === 'hist') ? 'caja' : 'linea' });
+      if (c.tipo === 'hist') {
+        var dh = '';
+        c.puntos.forEach(function (pt) {
+          if (!(pt[2] > 0) || pt[1] <= o.x.min || pt[0] >= o.x.max) return;
+          var xa = X(Math.max(pt[0], o.x.min)), xb = X(Math.min(pt[1], o.x.max)), sep = xb - xa > 3 ? 0.5 : 0, yt = Y(Math.min(pt[2], o.y.max));
+          dh += 'M' + (xa + sep).toFixed(1) + ',' + Y(o.y.min).toFixed(1) + 'V' + yt.toFixed(1) + 'H' + (xb - sep).toFixed(1) + 'V' + Y(o.y.min).toFixed(1) + 'Z';
+        });
+        s('path', { d: dh, fill: c.color, opacity: c.opacidad || 1 }, svg);
+      } else if (c.tipo === 'barras') {
         var wpx = Math.abs(X(c.ancho) - X(0)), w = Math.max(1, Math.min(24, wpx - 2));
         c.puntos.forEach(function (pt) {
           if (!(pt[1] > 0)) return;
@@ -162,12 +171,16 @@
         var dl = '';
         c.puntos.forEach(function (pt, i) { dl += (i ? 'L' : 'M') + X(pt[0]).toFixed(1) + ',' + Y(Math.min(pt[1], o.y.max)).toFixed(1); });
         if (c.area) s('path', { d: dl + 'L' + X(c.puntos[c.puntos.length - 1][0]) + ',' + Y(o.y.min) + 'L' + X(c.puntos[0][0]) + ',' + Y(o.y.min) + 'Z', fill: c.color, opacity: 0.1 }, svg);
-        s('path', { d: dl, fill: 'none', stroke: c.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+        var at = { d: dl, fill: 'none', stroke: c.color, 'stroke-width': c.grosor || 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+        if (c.trazo) at['stroke-dasharray'] = c.trazo;
+        s('path', at, svg);
         if (c.marcadores) c.puntos.forEach(function (pt) { s('circle', { cx: X(pt[0]), cy: Y(pt[1]), r: 3, fill: c.color, stroke: '#fff', 'stroke-width': 1.5 }, svg); });
         if (c.etiquetaFin) { var u = c.puntos[c.puntos.length - 1]; texto(svg, X(u[0]) + 6, Y(u[1]) + 4, c.etiquetaFin, 'g-nota'); }
       }
     });
     leyenda(p, series);
+    if (o.esquina) texto(svg, mg.l + pw - 4, mg.t + 13, o.esquina, 'g-esquina', 'end');
+    if (o.esquina2) texto(svg, mg.l + pw - 4, mg.t + 29, o.esquina2, 'g-esquina2', 'end');
 
     // marcas verticales con etiqueta
     (o.marcasX || []).forEach(function (m) {
@@ -254,7 +267,13 @@
       var et = texto(g, wEt, y + altoFila / 2 + 4, f.etiqueta, 'g-etiqueta' + (f.destacada ? ' g-fuerte' : ''), 'end');
       if (et.getComputedTextLength() > wEt - 2) { et.setAttribute('textLength', wEt - 4); et.setAttribute('lengthAdjust', 'spacingAndGlyphs'); }
       var cy = y + altoFila / 2;
-      if (o.tipo === 'rango') {
+      if (o.tipo === 'caja') {
+        s('line', { x1: X(f.p10), x2: X(f.p90), y1: cy, y2: cy, stroke: '#7C8792', 'stroke-width': 1.5 }, g);
+        s('line', { x1: X(f.p10), x2: X(f.p10), y1: cy - 4, y2: cy + 4, stroke: '#7C8792', 'stroke-width': 1.5 }, g);
+        s('line', { x1: X(f.p90), x2: X(f.p90), y1: cy - 4, y2: cy + 4, stroke: '#7C8792', 'stroke-width': 1.5 }, g);
+        s('rect', { x: X(f.p25), y: cy - 8, width: Math.max(1, X(f.p75) - X(f.p25)), height: 16, rx: 3, fill: colores[0], opacity: 0.85 }, g);
+        s('line', { x1: X(f.p50), x2: X(f.p50), y1: cy - 10, y2: cy + 10, stroke: '#1D2228', 'stroke-width': 2.5 }, g);
+      } else if (o.tipo === 'rango') {
         s('line', { x1: X(f.inf), x2: X(f.sup), y1: cy, y2: cy, stroke: colores[0], 'stroke-width': 2, 'stroke-linecap': 'round' }, g);
         s('circle', { cx: X(f.valor), cy: cy, r: 5, fill: colores[0], stroke: '#fff', 'stroke-width': 2 }, g);
         if (o.etiquetaValor) texto(g, X(Math.max(f.sup, f.valor)) + 8, cy + 4, o.etiquetaValor(f), 'g-valor');

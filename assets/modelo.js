@@ -110,5 +110,44 @@
     };
   }
 
-  window.Modelo = { crear: crear, acumuladaT: acumuladaT, cuantilT: cuantilT, densidadT: densidadT };
+  // Función gama incompleta regularizada P(a, x)
+  function gammaP(a, x) {
+    if (x <= 0) return 0;
+    var gln = lgamma(a), i;
+    if (x < a + 1) {
+      var ap = a, sum = 1 / a, del = sum;
+      for (i = 0; i < 500; i++) { ap += 1; del *= x / ap; sum += del; if (Math.abs(del) < Math.abs(sum) * 3e-14) break; }
+      return sum * Math.exp(-x + a * Math.log(x) - gln);
+    }
+    var b = x + 1 - a, c = 1 / 1e-300, d = 1 / b, h = d;
+    for (i = 1; i < 500; i++) {
+      var an = -i * (i - a); b += 2;
+      d = an * d + b; if (Math.abs(d) < 1e-300) d = 1e-300;
+      c = b + an / c; if (Math.abs(c) < 1e-300) c = 1e-300;
+      d = 1 / d; var dl = d * c; h *= dl;
+      if (Math.abs(dl - 1) < 3e-14) break;
+    }
+    return 1 - Math.exp(-x + a * Math.log(x) - gln) * h;
+  }
+
+  // Densidad SMN estándar f0(z) de las cinco distribuciones (mismas expresiones que el código en R)
+  var RAIZ2PI = Math.sqrt(2 * Math.PI);
+  function densidadSMN(fam, z, nu, tau) {
+    var z2 = z * z;
+    if (fam === 'N') return Math.exp(-0.5 * z2) / RAIZ2PI;
+    if (fam === 'T') return densidadT(z, nu);
+    if (fam === 'SL') {
+      if (z2 < 1e-8) return 2 * nu / (2 * nu + 1) / RAIZ2PI;
+      return Math.exp(Math.log(nu) + (nu + 0.5) * Math.log(2 / z2) + lgamma(nu + 0.5)) * gammaP(nu + 0.5, z2 / 2) / RAIZ2PI;
+    }
+    if (fam === 'CN') return (nu * Math.sqrt(tau) * Math.exp(-0.5 * tau * z2) + (1 - nu) * Math.exp(-0.5 * z2)) / RAIZ2PI;
+    var az = Math.abs(z), e = Math.exp(-az);
+    return e / ((1 + e) * (1 + e));
+  }
+  // Densidad TP-SMN del error: g(r) = (1/sigma) f0(r / (sigma (1 - alpha s)))
+  function densidadError(fam, r, sigma, alpha, nu, tau) {
+    return densidadSMN(fam, r / (sigma * (r > 0 ? 1 - alpha : 1 + alpha)), nu, tau) / sigma;
+  }
+
+  window.Modelo = { crear: crear, acumuladaT: acumuladaT, cuantilT: cuantilT, densidadT: densidadT, densidadSMN: densidadSMN, densidadError: densidadError, gammaP: gammaP };
 })();

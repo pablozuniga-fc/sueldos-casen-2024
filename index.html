@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sueldos de los asalariados en la Casen 2024 | Regresión con errores t de dos piezas</title>
-<meta name="description" content="Tablero interactivo de una tesis de Ingeniería en Estadística: distribución de los sueldos líquidos de 49.503 asalariados de la Casen 2024 y simulador de perfiles con un modelo de regresión con errores t de dos piezas. Resultados preliminares.">
+<title>Modelos de regresión lineal con errores de dos piezas | Sueldos de la Casen 2024</title>
+<meta name="description" content="Tablero interactivo de una tesis de Ingeniería en Estadística: modelos de regresión lineal con errores de distribuciones de dos piezas basadas en mezclas de escala de la normal, aplicados al sueldo líquido de 49.503 asalariados de la Casen 2024. Resultados preliminares.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wdth,wght@6..12,75..125,300..1000&display=swap" rel="stylesheet">
@@ -14,11 +14,21 @@
 <body>
 <a class="salto" href="#contenido">Ir al contenido</a>
 
+<div class="institucion">
+  <div class="ancho inst-in">
+    <img src="assets/logo-usach.png" alt="Universidad de Santiago de Chile" width="155" height="72">
+    <div class="inst-txt">
+      <span>Facultad de Ciencia</span>
+      <span>Departamento de Matemática y Ciencia de la Computación</span>
+    </div>
+  </div>
+</div>
+
 <header class="cabecera">
   <div class="ancho cab-in">
     <div class="cab-titulo">
-      <h1>Sueldos de los asalariados en la Casen 2024</h1>
-      <p class="cab-sub">Regresión con errores t de dos piezas aplicada a 49.503 asalariados</p>
+      <h1>Modelos de regresión lineal con errores de dos piezas</h1>
+      <p class="cab-sub">Distribuciones de dos piezas basadas en mezclas de escala de la normal. Aplicación al sueldo líquido de 49.503 asalariados de la Encuesta Casen 2024.</p>
     </div>
     <div class="cab-meta">
       <span class="sello">Resultados preliminares, noviembre de 2026</span>
@@ -30,27 +40,29 @@
 
 <nav class="pestanas" aria-label="Secciones del tablero">
   <div class="ancho" role="tablist">
-    <button class="pestana" role="tab" data-ir="panorama" aria-selected="true">Panorama</button>
-    <button class="pestana" role="tab" data-ir="sueldos" aria-selected="false">Los sueldos</button>
-    <button class="pestana" role="tab" data-ir="simulador" aria-selected="false">Simulador de perfiles</button>
-    <button class="pestana" role="tab" data-ir="efectos" aria-selected="false">Qué mueve el sueldo</button>
-    <button class="pestana" role="tab" data-ir="pesos" aria-selected="false">Pesos y ajuste</button>
-    <button class="pestana" role="tab" data-ir="ficha" aria-selected="false">Ficha técnica</button>
+    <button class="pestana" role="tab" data-ir="presentacion" aria-selected="true">Presentación</button>
+    <button class="pestana" role="tab" data-ir="descriptivo" aria-selected="false">Análisis descriptivo</button>
+    <button class="pestana" role="tab" data-ir="comparacion" aria-selected="false">Comparación de modelos</button>
+    <button class="pestana" role="tab" data-ir="condicional" aria-selected="false">Distribución condicional</button>
+    <button class="pestana" role="tab" data-ir="inferencia" aria-selected="false">Inferencia</button>
+    <button class="pestana" role="tab" data-ir="diagnostico" aria-selected="false">Diagnóstico</button>
+    <button class="pestana" role="tab" data-ir="extension" aria-selected="false">Extensión por nivel educacional</button>
+    <button class="pestana" role="tab" data-ir="metodologia" aria-selected="false">Metodología</button>
   </div>
 </nav>
 
 <main id="contenido" class="ancho">
 
-<!-- ============================ PANORAMA ============================ -->
-<section class="seccion" id="sec-panorama" role="tabpanel">
+<!-- ============================ PRESENTACIÓN ============================ -->
+<section class="seccion" id="sec-presentacion" role="tabpanel">
   <div class="apertura">
     <div>
-      <h2>El sueldo más frecuente no es el sueldo promedio</h2>
-      <p>Entre los <span data-v="n"></span> asalariados de la muestra, el sueldo líquido más declarado es <strong data-v="frecuente"></strong>, la mediana es <strong data-v="mediana"></strong> y la media, <strong data-v="media"></strong>. La distribución es asimétrica: muchos sueldos se concentran en la parte baja y una cola larga se extiende hacia los sueldos altos.</p>
-      <p>Por eso esta tesis no modela el promedio. Estima el sueldo más frecuente de cada perfil de trabajador, la moda, con una regresión cuyos errores siguen una distribución t de dos piezas, que admite asimetría y colas pesadas sin transformar el sueldo.</p>
+      <h2>Regresión lineal con errores asimétricos y de colas pesadas</h2>
+      <p>El modelo de regresión lineal clásico supone errores con distribución normal: simétricos y con pocos valores extremos. El sueldo líquido de los <span data-v="n"></span> asalariados de la muestra no se comporta así. El monto más declarado es <strong data-v="frecuente"></strong>, la mediana es <strong data-v="mediana"></strong> y la media, <strong data-v="media"></strong>; su coeficiente de asimetría es <span data-v="asimetria"></span> y su curtosis, <span data-v="curtosis"></span>, frente a 0 y 3 de la distribución normal.</p>
+      <p>Una salida habitual es transformar el sueldo, por ejemplo con el logaritmo, pero entonces los coeficientes dejan de leerse en pesos. Esta tesis mantiene el sueldo en pesos y cambia el supuesto sobre el error: lo modela con distribuciones de dos piezas basadas en mezclas de escala de la normal (TP-SMN), que admiten asimetría y colas pesadas.</p>
     </div>
     <figure class="fig" id="fig-apertura">
-      <figcaption><h3>Sueldo líquido mensual de los asalariados</h3><p>Porcentaje de la muestra en tramos de $50.000. Se muestran los sueldos hasta $3.000.000.</p></figcaption>
+      <figcaption><h3>Distribución del sueldo líquido mensual</h3><p>Porcentaje de la muestra en tramos de $50.000. Se muestran los sueldos hasta $3.000.000.</p></figcaption>
       <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
       <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
       <p class="fig-nota">El <span data-v="mayor_total"></span> de la muestra declara más de $3.025.000 y queda fuera del gráfico.</p>
@@ -58,40 +70,88 @@
   </div>
 
   <div class="franja">
-    <div class="cifra"><div class="cifra-rot">Asalariados en la muestra</div><div class="cifra-val" data-v="n"></div><div class="cifra-nota">de 218.367 personas encuestadas</div></div>
-    <div class="cifra"><div class="cifra-rot">Declaran exactamente $500.000</div><div class="cifra-val" data-v="frecuente_pct"></div><div class="cifra-nota">el sueldo más repetido de la muestra</div></div>
-    <div class="cifra"><div class="cifra-rot">Sueldos bajo la moda estimada</div><div class="cifra-val" data-v="prop_obs"></div><div class="cifra-nota">el modelo espera <span data-v="prop_esp"></span></div></div>
-    <div class="cifra"><div class="cifra-rot">BIC del modelo t de dos piezas</div><div class="cifra-val" data-v="bic_tpt"></div><div class="cifra-nota">modelo normal: <span data-v="bic_normal"></span>; menor es mejor</div></div>
+    <div class="cifra"><div class="cifra-rot">Asalariados en la muestra</div><div class="cifra-val" data-v="n"></div><div class="cifra-nota">Encuesta Casen 2024</div></div>
+    <div class="cifra"><div class="cifra-rot">Coeficiente de asimetría del sueldo</div><div class="cifra-val" data-v="asimetria"></div><div class="cifra-nota">distribución normal: 0</div></div>
+    <div class="cifra"><div class="cifra-rot">Curtosis del sueldo</div><div class="cifra-val" data-v="curtosis"></div><div class="cifra-nota">distribución normal: 3</div></div>
+    <div class="cifra"><div class="cifra-rot">Modelos estimados</div><div class="cifra-val">20</div><div class="cifra-nota">5 distribuciones, simétricas y de dos piezas, con 2 especificaciones</div></div>
   </div>
 
   <div class="dos amplio-izq bloque">
+    <figure class="fig" id="fig-dospiezas">
+      <figcaption><h3>Distribución t de dos piezas</h3><p>Dos mitades de una densidad t simétrica, con escalas distintas, unidas en la moda. Se muestra con escala σ = 1 y moda en 0; la línea punteada es la normal estándar.</p></figcaption>
+      <div class="controles">
+        <label class="campo"><span>Asimetría α</span><span class="rango-fila"><input type="range" id="dp-alpha" min="-0.9" max="0.9" step="0.01" value="-0.56"><output id="dp-alpha-out"></output></span></label>
+        <label class="campo"><span>Parámetro de colas ν</span><span class="rango-fila"><input type="range" id="dp-nu" min="1.01" max="30" step="0.01" value="1.33"><output id="dp-nu-out"></output></span></label>
+        <button class="btn-tabla" type="button" id="dp-estimado">Usar las estimaciones del modelo seleccionado</button>
+      </div>
+      <div class="fig-barra"><div class="fig-leyenda"></div></div>
+      <div class="fig-plot"></div>
+      <p class="fig-nota" id="dp-lectura"></p>
+    </figure>
     <div class="panel">
-      <h3>Cómo se llegó a la muestra</h3>
-      <div id="flujo"></div>
+      <h3>El modelo</h3>
+      <div class="formula">y<sub>i</sub> = x<sub>i</sub>′β + ε<sub>i</sub>, &nbsp; ε<sub>i</sub> ~ TP-SMN(0, σ², α, ν)</div>
+      <ul>
+        <li><strong>x<sub>i</sub>′β es la moda condicional:</strong> el sueldo más probable de una persona con características x<sub>i</sub>. Cada coeficiente es un cambio en esa moda, en pesos.</li>
+        <li><strong>α regula la asimetría.</strong> La proporción de sueldos bajo la moda es (1 + α)/2; con α negativo, la mayor parte queda sobre la moda.</li>
+        <li><strong>σ(1 + α) y σ(1 − α)</strong> son las escalas, o dispersiones, bajo y sobre la moda.</li>
+        <li><strong>ν regula el peso de las colas</strong> en las distribuciones t, slash y normal contaminada: mientras menor es, más frecuentes son los valores alejados.</li>
+      </ul>
+      <p>Con α = 0 se obtiene el modelo simétrico (SMN), y con α = 0 y distribución normal, la regresión lineal clásica.</p>
+    </div>
+  </div>
+
+  <div class="dos bloque">
+    <div class="panel">
+      <h3>Etapas del análisis</h3>
+      <ol>
+        <li><strong>Análisis descriptivo</strong> del sueldo y de las variables explicativas.</li>
+        <li><strong>Estimación de 20 modelos</strong> por máxima verosimilitud con el algoritmo ECME y comparación con los criterios AIC y BIC.</li>
+        <li><strong>Inferencia</strong> en el modelo seleccionado: errores estándar e intervalos de confianza.</li>
+        <li><strong>Diagnóstico</strong> con residuos cuantílicos y pesos de las observaciones.</li>
+        <li><strong>Extensión</strong> del modelo seleccionado: escala y asimetría propias de cada nivel educacional.</li>
+      </ol>
     </div>
     <div class="panel">
-      <h3>Antes de leer los resultados</h3>
+      <h3>Alcance de los resultados</h3>
       <ul>
         <li><strong>Describen la muestra.</strong> Los modelos se estimaron sin factores de expansión; las cifras no son estimaciones para la población.</li>
-        <li><strong>El modelo no es exacto.</strong> Sus colas son más pesadas que las de los datos: la media del error según el modelo es <span data-v="media_modelo"></span> y la observada, <span data-v="media_obs"></span>.</li>
-        <li><strong>Ajusta peor en los niveles educacionales altos.</strong> En profesional completo y postgrado completo los residuos tienen la mayor dispersión.</li>
-        <li><strong>La estimación es un máximo local.</strong> El parámetro de colas se buscó entre 1,01 y 100; por el redondeo de los sueldos, la verosimilitud no está acotada para valores muy bajos de ese parámetro (menores que 0,278).</li>
+        <li><strong>El sueldo se modela en pesos</strong> y las variables explicativas entran solo en forma lineal, sin transformaciones.</li>
+        <li><strong>No se realizan pruebas de hipótesis.</strong> Se informan estimaciones, errores estándar e intervalos de 95 % de confianza.</li>
+        <li><strong>Son resultados preliminares</strong> y pueden cambiar durante la revisión de la tesis.</li>
       </ul>
     </div>
   </div>
 </section>
 
-<!-- ============================ LOS SUELDOS ============================ -->
-<section class="seccion" id="sec-sueldos" role="tabpanel" hidden>
-  <h2>Los sueldos de la muestra</h2>
-  <p class="entrada">Sueldo o salario líquido del mes anterior en el trabajo principal, en pesos, tal como lo declara cada persona.</p>
+<!-- ============================ ANÁLISIS DESCRIPTIVO ============================ -->
+<section class="seccion" id="sec-descriptivo" role="tabpanel" hidden>
+  <h2>Análisis descriptivo</h2>
+  <p class="entrada">Variable respuesta: sueldo o salario líquido del mes anterior en el trabajo principal, en pesos, tal como lo declara cada persona.</p>
 
+  <div class="dos amplio-izq">
+    <div class="panel">
+      <h3>Selección de la muestra</h3>
+      <div id="flujo"></div>
+    </div>
+    <div class="panel">
+      <h3>Variables explicativas y especificaciones</h3>
+      <p>Todas las especificaciones incluyen la edad (años), las horas semanales de trabajo, el sexo y el tamaño de la empresa (cuatro categorías). La educación se mide de dos formas, que definen dos especificaciones del predictor lineal:</p>
+      <ul>
+        <li><strong>Especificación A:</strong> años de escolaridad, como una variable continua (8 coeficientes).</li>
+        <li><strong>Especificación B:</strong> nivel educacional en siete categorías, con básica o menos como referencia (13 coeficientes).</li>
+      </ul>
+      <p>Categorías de referencia: mujer, microempresa (1 a 9 personas) y, en la especificación B, básica o menos.</p>
+    </div>
+  </div>
+
+  <h3 class="subtitulo">Distribución del sueldo</h3>
   <div class="filtros">
     <label class="campo"><span>Grupo</span><select id="sel-grupo"></select></label>
     <label class="campo"><span>Comparar con</span><select id="sel-comparar"></select></label>
   </div>
   <figure class="fig" id="fig-hist">
-    <figcaption><h3>Distribución del sueldo</h3><p>Porcentaje de cada grupo en tramos de $50.000, hasta $3.000.000.</p></figcaption>
+    <figcaption><h3>Histograma del sueldo líquido mensual</h3><p>Porcentaje de cada grupo en tramos de $50.000, hasta $3.000.000.</p></figcaption>
     <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
     <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
     <p class="fig-nota" id="nota-hist"></p>
@@ -105,31 +165,116 @@
       <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
     </figure>
     <div class="panel">
-      <h3>Los sueldos se declaran redondeados</h3>
+      <h3>Redondeo de los sueldos declarados</h3>
       <p>El <span data-v="m10"></span> de los sueldos es múltiplo de $10.000, el <span data-v="m50"></span> de $50.000 y el <span data-v="m100"></span> de $100.000. Entre <span data-v="n"></span> personas hay solo <span data-v="distintos"></span> montos distintos.</p>
       <p>El monto más repetido, $500.000, coincide con el del ingreso mínimo mensual, que es un monto bruto, vigente desde julio de 2024.</p>
-      <p>Este redondeo importa para el modelo: cuando muchas personas declaran el mismo monto, la verosimilitud de una regresión con errores t puede crecer sin límite, y por eso el parámetro de colas se busca en un rango acotado.</p>
+      <p>El redondeo importa para los modelos: una densidad continua no puede reproducir la concentración de personas en un monto exacto, y cuando muchas personas declaran el mismo monto la verosimilitud de una regresión con errores t puede crecer sin límite. Por eso el parámetro de colas se busca en un intervalo acotado.</p>
     </div>
   </div>
 
-  <div class="dos bloque">
+  <h3 class="subtitulo">Sueldo y variables continuas</h3>
+  <p class="entrada">Sueldo medio y mediano según cada variable. En la esquina de cada gráfico se indica el coeficiente de correlación de Spearman (ρ) entre el sueldo y la variable, calculado con las <span data-v="n"></span> observaciones.</p>
+  <div class="tres bloque">
     <figure class="fig" id="fig-perfil-esc">
-      <figcaption><h3>Sueldo según años de escolaridad</h3><p>Sueldo medio y mediano de quienes tienen cada cantidad de años de escolaridad.</p></figcaption>
+      <figcaption><h3>Años de escolaridad</h3></figcaption>
       <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
       <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
     </figure>
     <figure class="fig" id="fig-perfil-edad">
-      <figcaption><h3>Sueldo según edad</h3><p>Sueldo medio y mediano por edad, con el mismo eje vertical que el gráfico de escolaridad.</p></figcaption>
+      <figcaption><h3>Edad</h3></figcaption>
       <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
       <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
     </figure>
+    <figure class="fig" id="fig-perfil-horas">
+      <figcaption><h3>Horas semanales</h3></figcaption>
+      <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
+      <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
+      <p class="fig-nota">Se muestran las jornadas declaradas por al menos 30 personas.</p>
+    </figure>
+  </div>
+
+  <h3 class="subtitulo">Sueldo y variables categóricas</h3>
+  <figure class="fig" id="fig-cajas">
+    <figcaption><h3>Distribución del sueldo según nivel educacional, sexo y tamaño de la empresa</h3><p>Caja: percentiles 25 a 75. Línea central: mediana. Extremos: percentiles 10 y 90.</p></figcaption>
+    <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
+    <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
+    <p class="fig-nota">La mediana y la dispersión del sueldo crecen con el nivel educacional: en postgrado completo la distancia entre los percentiles 25 y 75 es varias veces la de básica o menos.</p>
+  </figure>
+</section>
+
+<!-- ============================ COMPARACIÓN DE MODELOS ============================ -->
+<section class="seccion" id="sec-comparacion" role="tabpanel" hidden>
+  <h2>Comparación de modelos</h2>
+  <p class="entrada">Se estimaron 20 modelos por máxima verosimilitud: cinco distribuciones del error (normal, t de Student, slash, normal contaminada y logística), cada una en versión simétrica (SMN) y de dos piezas (TP-SMN), con las especificaciones A y B. El modelo se selecciona con el criterio de información bayesiano (BIC); menor valor indica mejor ajuste.</p>
+
+  <div class="filtros">
+    <div class="campo"><span id="rot-esp">Especificación de la educación</span>
+      <div class="segmento" role="radiogroup" aria-labelledby="rot-esp">
+        <input type="radio" name="esp" id="esp-b" value="B" checked><label for="esp-b">B: nivel educacional (7 categorías)</label>
+        <input type="radio" name="esp" id="esp-a" value="A"><label for="esp-a">A: años de escolaridad</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Criterios de información y parámetros de forma estimados</h3>
+    <div id="tabla-comparacion" class="tabla-ancha"></div>
+    <p class="fig-nota">m: número de parámetros. ℓ: log-verosimilitud maximizada. AIC = −2ℓ + 2m; BIC = −2ℓ + m·log(n). σ, α y ν son las estimaciones de la escala, la asimetría (0 en los modelos simétricos) y el parámetro de mezcla (en la normal contaminada, ν y τ). La columna «Bajo la moda» compara la proporción (1 + α)/2 del modelo con la proporción observada de residuos menores o iguales que cero. La fila destacada es el modelo de menor BIC entre los 20.</p>
+  </div>
+
+  <figure class="fig bloque" id="fig-bic">
+    <figcaption><h3>BIC de los diez modelos de la especificación elegida</h3><p>En las cinco distribuciones, la versión de dos piezas tiene menor BIC que la simétrica.</p></figcaption>
+    <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
+    <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
+  </figure>
+
+  <h3 class="subtitulo">Residuos y densidad ajustada del error</h3>
+  <p class="entrada">Cada panel muestra el histograma de los residuos de un modelo (sueldo observado menos centro ajustado, en millones de pesos) y la densidad del error que ese modelo estima. Un modelo adecuado sigue la forma del histograma: su altura en el centro, su asimetría y sus colas.</p>
+  <div class="controles panel">
+    <label class="campo"><span>Ancho de barra</span><span class="rango-fila"><input type="range" id="cmp-ancho" min="0" max="17" step="1" value="7"><output id="cmp-ancho-out"></output></span></label>
+    <div class="campo"><span id="rot-vent">Ventana</span>
+      <div class="segmento" role="radiogroup" aria-labelledby="rot-vent">
+        <input type="radio" name="vent" id="vent-a" value="amplia" checked><label for="vent-a">−0,75 a 3,4 millones</label>
+        <input type="radio" name="vent" id="vent-c" value="centro"><label for="vent-c">Centro: −0,4 a 1 millón</label>
+      </div>
+    </div>
+    <button class="btn-tabla" type="button" id="cmp-fd">Ancho de Freedman-Diaconis</button>
+    <p class="fig-nota" id="cmp-nota"></p>
+  </div>
+  <div class="rejilla-modelos bloque" id="panel-modelos"></div>
+
+  <div class="dos amplio-izq bloque">
+    <div class="panel">
+      <h3>Residuos cuantílicos de los modelos de la especificación B</h3>
+      <p>Si un modelo fuera correcto, sus residuos cuantílicos tendrían distribución normal estándar: asimetría 0 y curtosis 3.</p>
+      <div id="tabla-modelos" class="tabla-ancha"></div>
+    </div>
+    <div class="panel">
+      <h3>Lectura</h3>
+      <ul>
+        <li>La distribución normal, simétrica o de dos piezas, queda lejos del histograma: no reproduce la concentración de residuos en el centro ni la cola derecha.</li>
+        <li>Las distribuciones de colas pesadas (t, slash y normal contaminada) se acercan al centro; sus versiones de dos piezas agregan la asimetría.</li>
+        <li>El menor BIC entre los 20 modelos corresponde a la t de dos piezas (TP-t) con la especificación B. Es el <strong>modelo seleccionado</strong>.</li>
+        <li>Aun en ese modelo, el histograma supera a la curva en la moda. Las pestañas «Diagnóstico» y «Extensión por nivel educacional» examinan la causa.</li>
+      </ul>
+    </div>
   </div>
 </section>
 
-<!-- ============================ SIMULADOR ============================ -->
-<section class="seccion" id="sec-simulador" role="tabpanel" hidden>
-  <h2>Simulador de perfiles</h2>
-  <p class="entrada">Elige un perfil y el modelo entrega su sueldo líquido más frecuente, la moda, y cómo se reparten los sueldos a su alrededor. Los cálculos usan las estimaciones del modelo t de dos piezas de la tesis.</p>
+<!-- ============================ DISTRIBUCIÓN CONDICIONAL ============================ -->
+<section class="seccion" id="sec-condicional" role="tabpanel" hidden>
+  <h2>Distribución condicional del sueldo por perfil</h2>
+  <p class="entrada">Para un perfil de características, el modelo entrega la moda condicional del sueldo y la distribución de los sueldos alrededor de ella. Los cálculos aplican las fórmulas del modelo a las estimaciones obtenidas en R.</p>
+
+  <div class="filtros">
+    <div class="campo"><span id="rot-mod">Modelo</span>
+      <div class="segmento" role="radiogroup" aria-labelledby="rot-mod">
+        <input type="radio" name="sim-mod" id="sm-0" value="M0" checked><label for="sm-0">M0: escala y asimetría comunes</label>
+        <input type="radio" name="sim-mod" id="sm-1" value="M1"><label for="sm-1">M1: escala por nivel</label>
+        <input type="radio" name="sim-mod" id="sm-3" value="M3"><label for="sm-3">M3: escala y asimetría por nivel</label>
+      </div>
+    </div>
+  </div>
 
   <div class="sim">
     <div>
@@ -139,14 +284,14 @@
     </div>
     <div>
       <div class="resultados uno" id="resultados"></div>
-      <div class="aviso" id="aviso-nivel" hidden><p>El modelo ajusta peor en profesional completo y postgrado completo: sus residuos tienen la mayor dispersión y sus sueldos reciben poco peso en la estimación. Lee estas cifras con cautela.</p></div>
+      <div class="aviso" id="aviso-nivel" hidden><p id="aviso-texto"></p></div>
 
       <figure class="fig bloque" id="fig-sim">
-        <figcaption><h3>Cómo reparte el modelo los sueldos de cada perfil</h3><p>Curva de densidad del sueldo líquido mensual: mientras más alta, más frecuente es ese sueldo. La línea vertical marca la moda.</p></figcaption>
+        <figcaption><h3>Densidad condicional del sueldo</h3><p>Mientras más alta la curva, más probable es ese sueldo según el modelo. La línea vertical marca la moda condicional.</p></figcaption>
         <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
         <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
         <div class="monto">
-          <label class="campo"><span>¿Qué proporción supera un monto?</span>
+          <label class="campo"><span>Probabilidad de superar un monto</span>
             <span class="rango-fila"><input type="range" id="monto" min="200000" max="4000000" step="50000" value="1000000"><output id="monto-out"></output></span>
           </label>
           <div class="monto-res" id="monto-res"></div>
@@ -154,24 +299,27 @@
       </figure>
 
       <div class="panel bloque">
-        <h3>Cómo leer el simulador</h3>
-        <ul>
-          <li>En este modelo, cambiar el perfil desplaza la curva completa sin cambiar su forma: la dispersión y la asimetría son las mismas para todos los perfiles.</li>
-          <li>La cola derecha del modelo es más pesada que la de los datos. Por eso el simulador no muestra percentiles más allá del 10 y el 90, y las probabilidades de superar montos altos deben leerse con cautela.</li>
-          <li>Las cifras describen la muestra de la Casen 2024 sin factores de expansión; no son estimaciones para la población ni una predicción del sueldo de una persona.</li>
-        </ul>
+        <h3>Lectura</h3>
+        <ul id="lectura-sim"></ul>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============================ EFECTOS ============================ -->
-<section class="seccion" id="sec-efectos" role="tabpanel" hidden>
-  <h2>Qué mueve el sueldo</h2>
-  <p class="entrada">Cada cifra es el cambio en el sueldo más frecuente asociado a una característica, con las demás fijas, según el modelo ajustado. Los intervalos son de 95 % de confianza.</p>
+<!-- ============================ INFERENCIA ============================ -->
+<section class="seccion" id="sec-inferencia" role="tabpanel" hidden>
+  <h2>Inferencia sobre los coeficientes de regresión</h2>
+  <p class="entrada">Cada coeficiente es el cambio en la moda condicional del sueldo asociado a una característica, con las demás fijas. Se informan estimaciones e intervalos de 95 % de confianza; no se realizan pruebas de hipótesis.</p>
 
   <div class="filtros">
-    <div class="campo"><span id="rot-ic">Intervalo de confianza calculado con</span>
+    <div class="campo"><span id="rot-infmod">Modelo</span>
+      <div class="segmento" role="radiogroup" aria-labelledby="rot-infmod">
+        <input type="radio" name="inf-mod" id="im-0" value="M0" checked><label for="im-0">M0: seleccionado</label>
+        <input type="radio" name="inf-mod" id="im-1" value="M1"><label for="im-1">M1: escala por nivel</label>
+        <input type="radio" name="inf-mod" id="im-3" value="M3"><label for="im-3">M3: escala y asimetría por nivel</label>
+      </div>
+    </div>
+    <div class="campo"><span id="rot-ic">Error estándar del intervalo</span>
       <div class="segmento" role="radiogroup" aria-labelledby="rot-ic">
         <input type="radio" name="ic" id="ic-cong" value="cong" checked><label for="ic-cong">Sándwich por conglomerado</label>
         <input type="radio" name="ic" id="ic-obs" value="obs"><label for="ic-obs">Información observada</label>
@@ -180,86 +328,194 @@
   </div>
 
   <figure class="fig" id="fig-efectos">
-    <figcaption><h3>Diferencia en la moda del sueldo respecto de la categoría de referencia</h3><p>Punto: estimación. Línea: intervalo de 95 % de confianza.</p></figcaption>
+    <figcaption><h3>Diferencia en la moda condicional respecto de la categoría de referencia</h3><p>Punto: estimación. Línea: intervalo de 95 % de confianza.</p></figcaption>
     <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
     <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
-    <p class="fig-nota">El sándwich por conglomerado admite que el modelo no sea exacto y que las personas de un mismo conglomerado de la encuesta se parezcan; es el que usa la tesis para sus intervalos.</p>
+    <p class="fig-nota" id="nota-efectos"></p>
   </figure>
 
   <div class="franja dos-col" id="efectos-continuas"></div>
 
   <div class="dos amplio-izq bloque">
     <figure class="fig" id="fig-mco">
-      <figcaption><h3>La moda y la media cuentan historias distintas</h3><p>Diferencia respecto de la categoría de referencia: en la moda (modelo t de dos piezas) y en la media (mínimos cuadrados).</p></figcaption>
+      <figcaption><h3>Moda condicional y media condicional</h3><p>Diferencia respecto de la categoría de referencia: en la moda (modelo t de dos piezas seleccionado, M0) y en la media (regresión normal por mínimos cuadrados ordinarios).</p></figcaption>
       <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
       <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
     </figure>
     <div class="panel">
-      <h3>Por qué difieren tanto</h3>
-      <p>Los coeficientes de mínimos cuadrados describen el promedio, que los sueldos muy altos arrastran hacia arriba. Los del modelo t de dos piezas describen el sueldo más frecuente, que casi no se mueve con esos sueldos.</p>
-      <p>En el modelo, la moda y la media de cada perfil difieren en una constante, así que la diferencia entre ambas columnas es compatible con que, en los datos, la distancia entre la media y la moda crezca con el nivel educacional. El modelo no representa eso.</p>
-      <p>Por la misma razón, las cifras de profesional completo y postgrado completo deben leerse con cautela: son los niveles en que el modelo ajusta peor.</p>
+      <h3>Dos estimadores de covarianza</h3>
+      <p><strong>Información observada:</strong> es el estimador que propone la literatura de regresión con errores t; supone que el modelo es correcto.</p>
+      <p><strong>Sándwich por conglomerado:</strong> admite que el modelo no sea exacto y que las personas de un mismo conglomerado de la encuesta se parezcan (11.860 conglomerados). Es el que usa la tesis en sus intervalos.</p>
+      <h3>Moda y media</h3>
+      <p>Los coeficientes de mínimos cuadrados describen la media, que los sueldos muy altos desplazan hacia arriba; los del modelo de dos piezas describen la moda. En el modelo con escala y asimetría comunes, la moda y la media de cada perfil difieren en una constante, por lo que la diferencia entre ambas columnas indica que, en los datos, la distancia entre la media y la moda crece con el nivel educacional.</p>
     </div>
   </div>
 </section>
 
-<!-- ============================ PESOS ============================ -->
-<section class="seccion" id="sec-pesos" role="tabpanel" hidden>
-  <h2>Pesos y ajuste</h2>
-  <p class="entrada">El modelo no trata igual a todos los sueldos: los que están lejos de la moda de su perfil pesan menos en la estimación. Aquí se ve cuánto pesa cada sueldo y dónde el modelo describe peor los datos.</p>
+<!-- ============================ DIAGNÓSTICO ============================ -->
+<section class="seccion" id="sec-diagnostico" role="tabpanel" hidden>
+  <h2>Diagnóstico del modelo seleccionado</h2>
+  <p class="entrada">Modelo t de dos piezas con la especificación B y escala y asimetría comunes (M0). Se examinan los pesos que el algoritmo de estimación asigna a cada observación y los residuos según nivel educacional.</p>
 
   <div class="dos amplio-izq">
     <figure class="fig" id="fig-peso-curva">
-      <figcaption><h3>Peso de un sueldo según su distancia a la moda de su perfil</h3><p>Distancia negativa: sueldo bajo la moda. Distancia positiva: sueldo sobre la moda.</p></figcaption>
+      <figcaption><h3>Peso de una observación según su distancia a la moda condicional</h3><p>Distancia negativa: sueldo bajo la moda. Distancia positiva: sueldo sobre la moda.</p></figcaption>
       <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
       <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
     </figure>
     <div class="panel">
-      <h3>Qué significa el peso</h3>
-      <p>Un sueldo que coincide con la moda de su perfil pesa <span data-v="peso_max"></span>. El peso baja de ½ cuando el sueldo está más de <span data-v="umbral_izq"></span> bajo la moda o más de <span data-v="umbral_der"></span> sobre ella.</p>
-      <p>El <span data-v="pct_bajo_total"></span> de los sueldos de la muestra tiene peso menor que ½. En promedio, los pesos valen 1.</p>
-      <p>Además, a igual peso, los sueldos bajo la moda influyen más en los coeficientes que los que están sobre ella, porque la mitad izquierda de la distribución es mucho más angosta.</p>
+      <h3>Pesos de las observaciones</h3>
+      <p>En los modelos de colas pesadas, cada observación recibe un peso que disminuye a medida que su sueldo se aleja de la moda de su perfil. Ese peso es el que usa el paso de mínimos cuadrados ponderados del algoritmo ECME.</p>
+      <p>Un sueldo que coincide con la moda pesa <span data-v="peso_max"></span>. El peso baja de ½ cuando el sueldo está más de <span data-v="umbral_izq"></span> bajo la moda o más de <span data-v="umbral_der"></span> sobre ella. El <span data-v="pct_bajo_total"></span> de los sueldos tiene peso menor que ½.</p>
     </div>
   </div>
 
   <div class="dos bloque">
     <figure class="fig" id="fig-peso-nivel">
-      <figcaption><h3>Sueldos con peso menor que ½, por nivel educacional</h3><p>Porcentaje de las personas de cada nivel.</p></figcaption>
+      <figcaption><h3>Observaciones con peso menor que ½, por nivel educacional</h3><p>Porcentaje de las personas de cada nivel.</p></figcaption>
       <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
       <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
-      <p class="fig-nota">La estimación descansa sobre todo en los sueldos cercanos a la moda de cada grupo; los sueldos altos de profesionales y postgraduados influyen poco.</p>
+      <p class="fig-nota">La estimación descansa en los sueldos cercanos a la moda; los sueldos altos de profesionales y postgraduados influyen poco.</p>
     </figure>
     <figure class="fig" id="fig-res-nivel">
-      <figcaption><h3>Residuos del modelo por nivel educacional</h3><p>Punto: media de los residuos cuantílicos. Línea: una desviación estándar a cada lado.</p></figcaption>
+      <figcaption><h3>Residuos cuantílicos por nivel educacional</h3><p>Punto: media. Línea: una desviación estándar a cada lado.</p></figcaption>
       <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
       <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
-      <p class="fig-nota">Si el modelo fuera correcto, en cada nivel la media sería 0 y la línea iría de −1 a 1 (líneas punteadas). No ocurre: la media y la dispersión crecen con el nivel educacional.</p>
+      <p class="fig-nota">Si el modelo fuera correcto, en cada nivel la media sería 0 y la línea iría de −1 a 1 (líneas punteadas). La media y la dispersión crecen con el nivel educacional.</p>
     </figure>
   </div>
 
+  <h3 class="subtitulo">Origen del desajuste: una sola distribución del error para siete niveles educacionales</h3>
+  <p class="entrada">El modelo seleccionado usa la misma densidad del error en todos los niveles. Al separar los residuos por nivel se observa que esa densidad es demasiado dispersa para los niveles bajos y demasiado concentrada para los altos.</p>
+  <div class="controles panel">
+    <label class="campo"><span>Barras por panel</span><span class="rango-fila"><input type="range" id="dg-barras" min="0" max="10" step="1" value="5"><output id="dg-barras-out"></output></span></label>
+    <p class="fig-nota">Cada panel muestra los residuos del nivel entre sus percentiles 2 y 95. La curva es la misma en los siete paneles.</p>
+  </div>
+  <div class="rejilla-niveles bloque" id="panel-diag-nivel"></div>
+
+  <figure class="fig bloque" id="fig-masa">
+    <figcaption><h3>Proporción de residuos a menos de $50.000 de la moda</h3><p>Valor observado en cada nivel y valor que asigna el modelo, que es el mismo en todos los niveles.</p></figcaption>
+    <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
+    <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
+    <p class="fig-nota">El desajuste en la moda que se observa en el histograma de todos los residuos es el resultado de reunir niveles con dispersiones distintas. La pestaña «Extensión por nivel educacional» estima modelos que incorporan esa diferencia.</p>
+  </figure>
+</section>
+
+<!-- ============================ EXTENSIÓN ============================ -->
+<section class="seccion" id="sec-extension" role="tabpanel" hidden>
+  <h2>Extensión: escala y asimetría según nivel educacional</h2>
+  <p class="entrada">El diagnóstico indica que la distribución del error cambia con el nivel educacional. La extensión mantiene el sueldo en pesos y el error t de dos piezas con moda en cero, y permite que la escala σ y la asimetría α sean propias de cada nivel; los coeficientes β y el parámetro de colas ν son comunes.</p>
+
+  <div class="panel">
+      <h3>Cuatro modelos anidados</h3>
+      <div class="formula">y<sub>i</sub> = x<sub>i</sub>′β + ε<sub>i</sub>, &nbsp; ε<sub>i</sub> ~ TP-t(0, σ²<sub>j(i)</sub>, α<sub>j(i)</sub>, ν), &nbsp; j(i): nivel educacional de la persona i</div>
+      <div id="tabla-ext" class="tabla-ancha"></div>
+      <p class="fig-nota">m: número de parámetros. ℓ: log-verosimilitud maximizada. Dif. BIC: diferencia con el BIC de M0. La fila destacada es el modelo de menor BIC. Todos se estimaron con el algoritmo ECME; los pasos de la extensión se deducen en la tesis.</p>
+  </div>
   <div class="panel bloque">
-    <h3>Cómo ajustan los modelos comparados</h3>
-    <p>Seis modelos con el nivel educacional en siete categorías. Menor BIC indica mejor ajuste. Si un modelo fuera correcto, sus residuos cuantílicos tendrían asimetría 0 y curtosis 3.</p>
-    <div id="tabla-modelos" style="overflow-x:auto"></div>
+      <h3>Resultado</h3>
+      <ul class="cols2">
+        <li><strong>La escala por nivel explica la mayor parte de la mejora:</strong> el BIC baja de <span data-v="x_bic0"></span> (M0) a <span data-v="x_bic1"></span> (M1).</li>
+        <li><strong>El menor BIC es el de M3,</strong> <span data-v="x_bic3"></span>, con escala y asimetría por nivel.</li>
+        <li><strong>ν sube</strong> de <span data-v="x_nu0"></span> a <span data-v="x_nu3"></span>: parte del peso de las colas que estimaba M0 provenía de reunir niveles con escalas distintas. Sigue bajo 2, de modo que el error estimado tiene media finita y varianza infinita.</li>
+        <li><strong>No se transforma el sueldo</strong> ni se usan funciones de enlace: cada nivel tiene sus propios parámetros, en pesos.</li>
+      </ul>
+  </div>
+
+  <h3 class="subtitulo">Parámetros del error por nivel educacional</h3>
+  <div class="filtros">
+    <div class="campo"><span id="rot-xmod">Modelo</span>
+      <div class="segmento" role="radiogroup" aria-labelledby="rot-xmod">
+        <input type="radio" name="x-mod" id="xm-3" value="M3" checked><label for="xm-3">M3: escala y asimetría por nivel</label>
+        <input type="radio" name="x-mod" id="xm-1" value="M1"><label for="xm-1">M1: escala por nivel</label>
+      </div>
+    </div>
+  </div>
+  <div class="dos">
+    <figure class="fig" id="fig-escalas">
+      <figcaption><h3>Escala del error bajo y sobre la moda</h3><p>σ(1 + α) y σ(1 − α) de cada nivel, en pesos. La línea gris muestra las escalas del modelo M0, iguales en todos los niveles.</p></figcaption>
+      <div class="fig-barra"><div class="fig-leyenda"></div><button class="btn-tabla" type="button" aria-pressed="false">Ver tabla</button></div>
+      <div class="fig-plot"></div><div class="fig-tabla" hidden></div>
+    </figure>
+    <div class="panel">
+      <h3>Lectura por nivel</h3>
+      <div id="tabla-nivel" class="tabla-ancha"></div>
+      <p class="fig-nota">Bajo la moda: proporción (1 + α)/2 de sueldos menores o iguales que la moda condicional. Mediana del error: distancia entre la mediana y la moda condicionales. Moda media: promedio de las modas ajustadas de las personas del nivel.</p>
+    </div>
+  </div>
+
+  <h3 class="subtitulo">Residuos y densidad ajustada, por nivel educacional</h3>
+  <p class="entrada">A la izquierda, el modelo M0 con una sola densidad del error; a la derecha, el modelo elegido arriba, con la densidad propia de cada nivel.</p>
+  <div class="controles panel">
+    <label class="campo"><span>Barras por panel</span><span class="rango-fila"><input type="range" id="x-barras" min="0" max="10" step="1" value="5"><output id="x-barras-out"></output></span></label>
+    <p class="fig-nota">Cada panel muestra los residuos del nivel entre sus percentiles 2 y 95, con las barras ancladas en la moda (residuo cero). En la esquina, D es la mayor diferencia entre la distribución de los residuos cuantílicos del nivel y la normal estándar: mientras menor, mejor.</p>
+  </div>
+  <div class="rejilla-pares bloque" id="panel-ext-nivel"></div>
+
+  <h3 class="subtitulo">Todos los residuos: densidad común y mezcla de las densidades por nivel</h3>
+  <p class="entrada">Histograma de los <span data-v="n"></span> residuos de cada modelo. En M1 y M3, la curva es la mezcla de las siete densidades por nivel, ponderadas por el tamaño de cada nivel.</p>
+  <div class="controles panel">
+    <label class="campo"><span>Ancho de barra</span><span class="rango-fila"><input type="range" id="xt-ancho" min="0" max="17" step="1" value="7"><output id="xt-ancho-out"></output></span></label>
+    <div class="campo"><span id="rot-xvent">Ventana</span>
+      <div class="segmento" role="radiogroup" aria-labelledby="rot-xvent">
+        <input type="radio" name="xvent" id="xvent-c" value="centro" checked><label for="xvent-c">Centro: −0,4 a 1 millón</label>
+        <input type="radio" name="xvent" id="xvent-a" value="amplia"><label for="xvent-a">−0,75 a 3,4 millones</label>
+      </div>
+    </div>
+  </div>
+  <div class="rejilla-tres bloque" id="panel-ext-total"></div>
+
+  <h3 class="subtitulo">Residuos cuantílicos por nivel educacional</h3>
+  <div>
+    <div>
+      <div class="rejilla-qq" id="panel-qq"></div>
+      <p class="fig-nota">Cuantiles de los residuos cuantílicos de cada nivel frente a los de la normal estándar. Línea gris: M0. Línea naranja: modelo elegido arriba. Si el modelo fuera correcto en el nivel, la curva coincidiría con la diagonal punteada.</p>
+    </div>
+    <div class="panel bloque">
+      <h3>Media, desviación estándar y distancia D</h3>
+      <div id="tabla-resq" class="tabla-ancha"></div>
+      <p class="fig-nota">D: mayor diferencia absoluta entre la distribución empírica de los residuos cuantílicos del nivel y la normal estándar. Se usa como medida descriptiva.</p>
+    </div>
+  </div>
+
+  <div class="dos bloque">
+    <div class="panel">
+      <h3>Coeficientes de la moda condicional en M0, M1 y M3</h3>
+      <div id="tabla-beta" class="tabla-ancha"></div>
+      <p class="fig-nota">Diferencias respecto de básica o menos, mujer y microempresa, en pesos.</p>
+    </div>
+    <div class="panel">
+      <h3>Interpretación y límites</h3>
+      <ul>
+        <li><strong>M1 conserva la lectura de M0:</strong> el nivel educacional desplaza la moda del sueldo.</li>
+        <li><strong>M3 ajusta mejor y cambia esa lectura.</strong> La moda ajustada queda cerca de $500.000 en los seis primeros niveles; el nivel educacional se asocia con la dispersión sobre la moda, de <span data-v="x_der_bas"></span> en básica o menos a <span data-v="x_der_pro"></span> en profesional completo, y con la proporción de sueldos bajo la moda.</li>
+        <li><strong>En M3 la moda no es un sueldo representativo de los niveles altos.</strong> En profesional completo solo el <span data-v="x_pb_pro"></span> de la distribución ajustada queda bajo la moda; para describir un sueldo representativo es preferible la mediana condicional, que es la moda más la mediana del error.</li>
+        <li><strong>Lo que no mejora.</strong> En todos los niveles, la barra más alta del histograma supera a la densidad en la moda por un factor similar (<span data-v="x_rz_min"></span> a <span data-v="x_rz_max"></span> en M3): es el efecto de los sueldos repetidos en montos exactos, que una densidad continua no reproduce.</li>
+        <li><strong>Es un desarrollo propio de la tesis.</strong> La escala variable entre observaciones tiene antecedentes en la literatura de regresión TP-SMN; la asimetría por grupos no se encontró en las fuentes revisadas, y sus propiedades no se estudiaron mediante simulación.</li>
+      </ul>
+    </div>
   </div>
 </section>
 
-<!-- ============================ FICHA ============================ -->
-<section class="seccion ficha" id="sec-ficha" role="tabpanel" hidden>
-  <h2>Ficha técnica</h2>
-  <p class="entrada">De dónde salen las cifras de este tablero y qué límites tienen.</p>
+<!-- ============================ METODOLOGÍA ============================ -->
+<section class="seccion ficha" id="sec-metodologia" role="tabpanel" hidden>
+  <h2>Metodología y fuentes</h2>
+  <p class="entrada">Origen de las cifras del tablero, métodos y límites.</p>
   <div class="panel">
     <dl>
       <dt>Fuente</dt><dd>Encuesta de Caracterización Socioeconómica Nacional (Casen) 2024, Ministerio de Desarrollo Social y Familia. Trabajo de campo entre el 1 de noviembre de 2024 y el 2 de febrero de 2025.</dd>
       <dt>Muestra</dt><dd><span data-v="n"></span> asalariados: hombres de 18 a 64 años y mujeres de 18 a 59 años, empleados u obreros del sector público o privado, con jornada habitual de 40 a 84 horas semanales, que no asisten a un establecimiento educacional y declaran un sueldo positivo.</dd>
-      <dt>Variable</dt><dd>Sueldo o salario líquido del mes anterior en el trabajo principal, en pesos y sin transformar.</dd>
-      <dt>Modelo</dt><dd><div class="formula">sueldo = x′β + ε, con ε ~ t de dos piezas (0, σ², α, ν)</div>x′β es la moda del sueldo de cada perfil. Las variables explicativas son el nivel educacional en siete categorías, la edad, las horas semanales, el sexo y el tamaño de la empresa; todas entran en forma lineal.</dd>
-      <dt>Estimaciones de forma</dt><dd>α = <span data-v="alpha"></span> (asimetría a la derecha) y ν = <span data-v="nu"></span> (colas pesadas; media finita y varianza infinita). La escala bajo la moda es <span data-v="esc_izq"></span> y sobre la moda, <span data-v="esc_der"></span>.</dd>
-      <dt>Estimación</dt><dd>Máxima verosimilitud con el algoritmo ECME, programado en R. Se compararon 20 modelos (cinco distribuciones, simétricas y de dos piezas, con dos formas de medir la educación) y se eligió el de menor BIC.</dd>
-      <dt>Intervalos</dt><dd>De 95 % de confianza, con errores estándar sándwich calculados por conglomerado de la encuesta (11.860 conglomerados). No se realizan pruebas de hipótesis.</dd>
-      <dt>Límites</dt><dd>La estimación es un máximo local dentro del rango de búsqueda de ν. Las colas del modelo son más pesadas que las de los datos. El ajuste empeora en los niveles educacionales altos, donde la distribución del error no es la misma que en el resto. Los modelos se estimaron sin factores de expansión, por lo que los resultados describen la muestra y no la población.</dd>
-      <dt>Cálculos del tablero</dt><dd>Las tablas provienen de la corrida en R de la tesis. Los histogramas son conteos por tramo de sueldo de la misma muestra. El simulador aplica las fórmulas del modelo a las estimaciones de R. El tablero no contiene registros individuales. <a href="datos/datos.json" download>Descargar los datos agregados (JSON)</a>.</dd>
-      <dt>Autor</dt><dd>Pablo Zúñiga Araya. Trabajo de tesis de Ingeniería en Estadística, Universidad de Santiago de Chile. Resultados preliminares, noviembre de 2026: pueden cambiar durante la revisión de la tesis.</dd>
+      <dt>Variable respuesta</dt><dd>Sueldo o salario líquido del mes anterior en el trabajo principal, en pesos y sin transformar.</dd>
+      <dt>Modelo</dt><dd><div class="formula">y<sub>i</sub> = x<sub>i</sub>′β + ε<sub>i</sub>, &nbsp; ε<sub>i</sub> ~ TP-SMN(0, σ², α, ν)</div>La familia TP-SMN (Maleki y Mahmoudi, 2017) une dos mitades de una mezcla de escala de la normal con escalas σ(1 + α) y σ(1 − α); la parametrización es la épsilon-asimétrica de Mudholkar y Hutson (2000) y Arellano-Valle, Gómez y Quintana (2005). x<sub>i</sub>′β es la moda condicional.</dd>
+      <dt>Estimación</dt><dd>Máxima verosimilitud con el algoritmo ECME (Liu y Rubin, 1994), programado en R: un paso E que calcula los pesos de las observaciones y pasos de maximización condicional para los coeficientes (mínimos cuadrados ponderados), la asimetría y la escala (forma cerrada) y el parámetro de mezcla.</dd>
+      <dt>Selección</dt><dd>Criterio de información bayesiano (Schwarz, 1978) entre 20 modelos; se informa también el AIC (Akaike, 1974). No se exige que la varianza del error sea finita.</dd>
+      <dt>Inferencia</dt><dd>Errores estándar de la información observada y de un estimador sándwich que agrupa las observaciones por conglomerado de la encuesta (White, 1982; Freedman, 2006). Intervalos de 95 % de confianza con el sándwich. No se realizan pruebas de hipótesis.</dd>
+      <dt>Diagnóstico</dt><dd>Residuos cuantílicos (Dunn y Smyth, 1996) y pesos de las observaciones.</dd>
+      <dt>Extensión</dt><dd>Escala y asimetría del error propias de cada nivel educacional, con coeficientes y parámetro de colas comunes. La regresión TP-SMN con escala variable entre observaciones fue propuesta por Hoseinzadeh, Maleki y Khodadadi (2021); la estimación por grupos y la asimetría por grupos son desarrollos propios de la tesis.</dd>
+      <dt>Histogramas de residuos</dt><dd>El ancho de barra inicial, <span data-v="fd"></span>, es el de la regla de Freedman y Diaconis (1981), dos veces el rango intercuartílico dividido por la raíz cúbica del número de observaciones, calculado con los residuos del modelo seleccionado. Cambiar el ancho no modifica el ajuste; solo cambia cuánto promedia cada barra.</dd>
+      <dt>Límites</dt><dd>Las estimaciones son máximos locales dentro del intervalo de búsqueda de ν (1,01 a 100); por el redondeo de los sueldos, la verosimilitud no está acotada para valores muy bajos de ν. Los modelos se estimaron sin factores de expansión, por lo que los resultados describen la muestra y no la población.</dd>
+      <dt>Cálculos del tablero</dt><dd>Las tablas provienen de la corrida en R de la tesis. Los histogramas son conteos por tramo de la misma muestra; los residuos se calcularon con las estimaciones de R, y la log-verosimilitud recalculada coincide con la de R en los 20 modelos y en los cuatro de la extensión. El tablero no contiene registros individuales. <a href="datos/datos.json" download>Descargar los datos agregados (JSON)</a>.</dd>
+      <dt>Autor</dt><dd>Pablo Zúñiga Araya. Tesis de Ingeniería en Estadística, Departamento de Matemática y Ciencia de la Computación, Facultad de Ciencia, Universidad de Santiago de Chile. Resultados preliminares, noviembre de 2026.</dd>
     </dl>
   </div>
 </section>
