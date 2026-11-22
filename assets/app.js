@@ -1,726 +1,994 @@
-/* Tablero de la tesis: conecta los datos agregados (datos/datos.js), las distribuciones (modelo.js) y los gráficos (graficos.js). */
+/* Tablero de la tesis: secciones, figuras e interacciones. */
 (function () {
   'use strict';
-  var D = window.DATOS, MOD = window.Modelo, M = MOD.crear(D.modelo), G = window.Graf, F4 = D.fase4;
-  var C1 = '#E77500', C2 = '#498BCA', GRIS = '#394049', BARRA = '#C3CAD1', TENUE = '#7C8792';
-  var MILLON = 1e6, NIV = F4.niveles;
+  var D = window.DATOS, F = G.F, el = G.el, tx = G.texto;
+  var C = { nivel: '#db6e00', comun: '#3d78b8', mco: '#394049', obs: '#c3c9d1', obs2: '#7d8691', tinta: '#262c33', tinta2: '#4b5560', tinta3: '#6b7581',
+    linea: '#dde2e7', naranja: '#e77500', nivelClaro: '#f4c08a', comunClaro: '#a9c3e2' };
+  var NIV = D.niveles, TAM = D.tamanos, N = D.meta.n;
+  var CORTO = { 'Básica o menos': 'Básica o menos', 'Media incompleta': 'Media incompleta', 'Media completa': 'Media completa', 'Superior incompleta': 'Superior incompleta',
+    'Técnico completo': 'Técnico completo', 'Profesional completo': 'Profesional completo', 'Postgrado completo': 'Postgrado completo' };
+  var FAM = { N: 'Normal', T: 't', SL: 'Slash', CN: 'Normal contaminada', L: 'Logística' };
+  var ORDEN_FAM = ['N', 'T', 'SL', 'CN', 'L'];
+  var MOD = { nivel: 'Escala por nivel', comun: 'Escala común' };
 
-  /* ---------- formatos (es-CL: punto de miles y coma decimal) ---------- */
-  function nf(d) { return new Intl.NumberFormat('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d }); }
-  var f0 = nf(0);
-  function num(v, d) { return (v < 0 ? '−' : '') + nf(d == null ? 0 : d).format(Math.abs(v)); }
-  function pesos(v) { return (v < 0 ? '−$' : '$') + f0.format(Math.abs(Math.round(v))); }
-  function pesosMil(v) { return pesos(Math.round(v / 1000) * 1000); }
-  function corto(v) {
-    var a = Math.abs(v), sg = v < 0 ? '−' : '';
-    if (a === 0) return '$0';
-    if (a >= MILLON) return sg + '$' + nf(a % MILLON === 0 ? 0 : 1).format(a / MILLON) + ' M';
-    return sg + '$' + f0.format(a / 1000) + ' mil';
-  }
-  function pct(v, d) { return num(v, d == null ? 1 : d) + ' %'; }
   function $(id) { return document.getElementById(id); }
-  function crear(tag, clase, texto) { var e = document.createElement(tag); if (clase) e.className = clase; if (texto != null) e.textContent = texto; return e; }
-  function techo(v, paso) { return Math.ceil(v / paso - 1e-9) * paso; }
-  function radio(nombre, fn) {
-    document.querySelectorAll('input[name="' + nombre + '"]').forEach(function (r) { r.addEventListener('change', function () { if (r.checked) fn(r.value); }); });
-  }
-  /* tabla HTML: cols = [texto], filas = [[celdas]], la primera columna es encabezado de fila */
-  function tablaEn(cont, cols, filas, claseFila, clase) {
-    cont.textContent = '';
-    var t = crear('table', 'tabla' + (clase ? ' ' + clase : '')), th = crear('thead'), tr = crear('tr');
-    cols.forEach(function (c, i) { var e = crear('th', i ? 'num' : '', c); e.setAttribute('scope', 'col'); tr.appendChild(e); });
-    th.appendChild(tr); t.appendChild(th);
-    var tb = crear('tbody');
-    filas.forEach(function (f, k) {
-      var r = crear('tr', claseFila ? claseFila(k) : '');
-      f.forEach(function (c, i) {
-        var celda = crear(i ? 'td' : 'th', i ? 'num' : '');
-        if (c && typeof c === 'object') { celda.textContent = c.t; if (c.fuerte) celda.classList.add('fuerte'); if (c.izq) celda.classList.remove('num'); }
-        else celda.textContent = c;
-        r.appendChild(celda);
-      });
-      tb.appendChild(r);
+  function plot(fig) { return $(fig).querySelector('.fig-plot'); }
+  function ley(fig) { return $(fig).querySelector('.fig-leyenda'); }
+  function tablaFig(fig) { var d = $(fig).querySelector('details.fig-tabla > div'); return d; }
+  function suma(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return s; }
+  function max(a) { return Math.max.apply(null, a); }
+  function min(a) { return Math.min.apply(null, a); }
+  function nombreModelo(m) { return m.tipo === 'TP' ? 'TP-' + (m.fam === 'T' ? '<i>t</i>' : FAM[m.fam]) : (m.fam === 'T' ? '<i>t</i>' : FAM[m.fam]); }
+  function nombreTxt(m) { return (m.tipo === 'TP' ? 'TP-' : '') + FAM[m.fam]; }
+
+  function segmento(cont, nombre, ops, val, cambio) {
+    cont.innerHTML = '';
+    ops.forEach(function (o, i) {
+      var id = nombre + '-' + i;
+      var inp = document.createElement('input'); inp.type = 'radio'; inp.name = nombre; inp.id = id; inp.value = o.v; inp.checked = o.v === val;
+      var lab = document.createElement('label'); lab.htmlFor = id; lab.innerHTML = o.t;
+      inp.addEventListener('change', function () { if (inp.checked) cambio(o.v); });
+      cont.appendChild(inp); cont.appendChild(lab);
     });
-    t.appendChild(tb); cont.appendChild(t);
-  }
-  function figuraMini(cont, titulo) {
-    var fg = crear('figure', 'fig mini'), cap = crear('figcaption');
-    cap.appendChild(crear('h4', '', titulo)); fg.appendChild(cap);
-    fg.appendChild(crear('div', 'fig-plot'));
-    cont.appendChild(fg);
-    return fg;
   }
 
-  /* ---------- pestañas ---------- */
-  var vistas = {}, activa = 'presentacion';
-  function registrar(id, fn) { (vistas[id] = vistas[id] || []).push(fn); }
-  function dibujar(id) { (vistas[id] || []).forEach(function (fn) { fn(); }); }
-  function mostrar(id, sinHistorial) {
-    if (!$('sec-' + id)) id = 'presentacion';
-    activa = id;
-    document.querySelectorAll('.seccion').forEach(function (sec) { sec.hidden = sec.id !== 'sec-' + id; });
-    document.querySelectorAll('.pestana').forEach(function (b) {
-      var sel = b.dataset.ir === id;
-      b.setAttribute('aria-selected', sel ? 'true' : 'false');
-      if (sel && b.scrollIntoView) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    });
-    G.ocultarTip();
-    dibujar(id);
-    if (!sinHistorial) history.replaceState(null, '', '#' + id);
-  }
-  document.querySelectorAll('.pestana').forEach(function (b) {
-    b.addEventListener('click', function () { mostrar(b.dataset.ir); window.scrollTo({ top: 0 }); });
-  });
-  var espera = null;
-  window.addEventListener('resize', function () { clearTimeout(espera); espera = setTimeout(function () { dibujar(activa); }, 120); });
-  window.addEventListener('hashchange', function () { mostrar(location.hash.slice(1), true); });
+  // ---------------------------------------------------------------- cifras en el texto
+  var VAL = { n: F.num(N), m10: F.pct(D.redondeo.m10), m50: F.pct(D.redondeo.m50), m100: F.pct(D.redondeo.m100), distintos: F.num(D.redondeo.distintos), fecha: D.meta.fecha };
+  document.querySelectorAll('[data-v]').forEach(function (e) { var k = e.getAttribute('data-v'); if (VAL[k] !== undefined) e.textContent = VAL[k]; });
 
-  /* ---------- modelos de la extensión: un objeto Modelo por modelo y nivel ---------- */
-  var cache = {};
-  function modeloDe(K, k) {
-    var id = K + '|' + k;
-    if (!cache[id]) {
-      var p = F4.modelos[K];
-      cache[id] = MOD.crear({ intercepto: p.intercepto, nivel: p.nivel, edad: p.edad, horas: p.horas, hombre: p.hombre, tam: p.tam, sigma2: p.sigma2[k], alpha: p.alpha[k], nu: p.nu });
-    }
-    return cache[id];
-  }
-  function filaComp(K) { return F4.comparacion.filter(function (c) { return c.modelo === K; })[0]; }
-  var NOMBRE_MOD = { M0: 'M0: escala y asimetría comunes', M1: 'M1: escala por nivel', M2: 'M2: asimetría por nivel', M3: 'M3: escala y asimetría por nivel' };
-
-  /* ---------- cifras en el texto ---------- */
-  var total = D.hist.grupos.total, um = M.umbralPeso();
-  var n3 = F4.nivel.M3, rz3 = F4.centro.M3.map(function (c) { return c.razon; });
-  var valores = {
-    n: f0.format(D.meta.n), frecuente: pesos(D.frecuentes[0].monto), frecuente_pct: pct(D.frecuentes[0].pct),
-    mediana: pesos(D.sueldo.mediana * MILLON), media: pesos(D.sueldo.media * MILLON),
-    asimetria: num(D.sueldo.asimetria, 3), curtosis: num(D.sueldo.curtosis, 3),
-    mayor_total: pct(100 * total.mayor / total.n),
-    m10: pct(D.redondeo.m10), m50: pct(D.redondeo.m50), m100: pct(D.redondeo.m100), distintos: f0.format(D.redondeo.distintos),
-    peso_max: num(M.peso(0), 2), umbral_izq: pesos(Math.round(-um.izq * 10000) * 100), umbral_der: pesos(Math.round(um.der * 10000) * 100),
-    pct_bajo_total: pct(D.pesos_nivel[D.pesos_nivel.length - 1].pct_bajo),
-    fd: pesos(D.hist_fino.fd * MILLON),
-    x_bic0: num(filaComp('M0').bic, 2), x_bic1: num(filaComp('M1').bic, 2), x_bic3: num(filaComp('M3').bic, 2),
-    x_nu0: num(filaComp('M0').nu, 3), x_nu3: num(filaComp('M3').nu, 3),
-    x_der_bas: pesosMil(n3[0].esc_der * MILLON), x_der_pro: pesosMil(n3[5].esc_der * MILLON), x_pb_pro: pct(100 * n3[5].p_bajo),
-    x_rz_min: num(Math.min.apply(null, rz3), 2), x_rz_max: num(Math.max.apply(null, rz3), 2)
-  };
-  document.querySelectorAll('[data-v]').forEach(function (e) { if (valores[e.dataset.v] != null) e.textContent = valores[e.dataset.v]; });
-
-  /* ---------- histograma del sueldo ---------- */
-  var centros = D.hist.centros, ancho = D.hist.ancho;
-  function porcentajes(g) { return g.c.map(function (c, i) { return [centros[i], 100 * c / g.n]; }); }
-  function tramo(x) { return x === 0 ? 'Menos de $25.000' : 'De ' + pesos(x - ancho / 2) + ' a ' + pesos(x + ancho / 2 - 1); }
-  var ejeSueldo = { min: -ancho / 2, max: centros[centros.length - 1] + ancho / 2, fmt: corto, titulo: 'Sueldo líquido mensual', marcas: [0, 500000, 1000000, 1500000, 2000000, 2500000, 3000000] };
-
-  /* ============================ PRESENTACIÓN ============================ */
-  registrar('presentacion', function () {
-    var pts = porcentajes(total), ymax = techo(Math.max.apply(null, pts.map(function (p) { return p[1]; })), 5);
-    G.xy($('fig-apertura'), {
-      alto: 330, descripcion: 'Histograma del sueldo líquido mensual de la muestra',
-      x: ejeSueldo, y: { min: 0, max: ymax, fmt: function (v) { return f0.format(v) + ' %'; } },
-      capas: [{ tipo: 'barras', puntos: pts, ancho: ancho, color: C1 }],
-      marcasX: [
-        { x: D.frecuentes[0].monto, texto: 'Más frecuente: ' + pesos(D.frecuentes[0].monto), nivel: 0, color: GRIS },
-        { x: D.sueldo.mediana * MILLON, texto: 'Mediana: ' + pesos(D.sueldo.mediana * MILLON), nivel: 1, color: GRIS },
-        { x: D.sueldo.media * MILLON, texto: 'Media: ' + pesos(D.sueldo.media * MILLON), nivel: 2, color: GRIS }
-      ],
-      puntosX: centros,
-      lectura: function (x, i) { return { titulo: tramo(x), filas: [{ color: C1, valor: pct(pts[i][1]), nombre: 'de la muestra' }], nota: f0.format(total.c[i]) + ' personas' }; },
-      tabla: { cols: ['Tramo de sueldo', '% de la muestra', 'Personas'], filas: pts.map(function (p, i) { return [tramo(p[0]), pct(p[1]), f0.format(total.c[i])]; }) }
-    });
-  });
-
-  function dibujarDosPiezas() {
-    var a = +$('dp-alpha').value, nu = +$('dp-nu').value, xs = [], tp = [], no = [];
-    for (var i = -400; i <= 600; i++) {
-      var x = i / 100; xs.push(x);
-      tp.push([x, MOD.densidadError('T', x, 1, a, nu)]);
-      no.push([x, MOD.densidadSMN('N', x)]);
-    }
-    $('dp-alpha-out').textContent = num(a, 2); $('dp-nu-out').textContent = num(nu, 2);
-    G.xy($('fig-dospiezas'), {
-      alto: 300, descripcion: 'Densidad t de dos piezas para los valores elegidos de asimetría y colas',
-      x: { min: -4, max: 6, fmt: function (v) { return num(v, 0); }, titulo: 'Error (en unidades de la escala σ)', marcas: [-4, -2, 0, 2, 4, 6] },
-      y: { min: 0, max: 0.46, sinEtiquetas: true, marcas: [0] },
-      capas: [{ tipo: 'linea', area: true, color: C1, nombre: 't de dos piezas', puntos: tp }, { tipo: 'linea', color: TENUE, nombre: 'Normal estándar', puntos: no, trazo: '4 4', grosor: 1.5 }],
-      marcasX: [{ x: 0, texto: 'Moda', nivel: 0, color: GRIS }],
-      puntosX: xs, inicioTeclado: 400,
-      lectura: function (xv, i) { return { titulo: 'Error = ' + num(xv, 2), filas: [{ color: C1, valor: num(tp[i][1], 3), nombre: 'densidad t de dos piezas' }, { color: TENUE, valor: num(no[i][1], 3), nombre: 'densidad normal' }] }; }
-    });
-    var cola = (1 - a) * MOD.acumuladaT(3 / (1 - a), nu, true);
-    $('dp-lectura').textContent = 'Proporción bajo la moda, (1 + α)/2: ' + pct(50 * (1 + a)) + '. Escala bajo la moda: ' + num(1 + a, 2) + ' σ; sobre la moda: ' + num(1 - a, 2) +
-      ' σ. Probabilidad de un error mayor que 3σ: ' + pct(100 * cola, 2) + ' (en la normal estándar, 0,13 %).';
-  }
-  $('dp-alpha').addEventListener('input', dibujarDosPiezas);
-  $('dp-nu').addEventListener('input', dibujarDosPiezas);
-  $('dp-estimado').addEventListener('click', function () { $('dp-alpha').value = D.modelo.alpha.toFixed(2); $('dp-nu').value = D.modelo.nu.toFixed(2); dibujarDosPiezas(); });
-  registrar('presentacion', dibujarDosPiezas);
-
-  /* ============================ ANÁLISIS DESCRIPTIVO ============================ */
-  (function flujo() {
-    var t = crear('table', 'tabla flujo'), tb = crear('tbody'), n0 = D.flujo[0].n;
-    var th = crear('thead'), tr = crear('tr');
-    ['Paso', 'Criterio', 'Personas', ''].forEach(function (c, i) { var e = crear('th', i === 2 ? 'num' : '', c); e.setAttribute('scope', 'col'); tr.appendChild(e); });
-    th.appendChild(tr); t.appendChild(th);
-    D.flujo.forEach(function (f) {
-      var r = crear('tr');
-      r.appendChild(crear('td', 'num', String(f.paso)));
-      r.appendChild(crear('th', '', f.criterio.replace(/\s*\([^)]*\)/g, '')));
-      r.appendChild(crear('td', 'num', f0.format(f.n)));
-      var c = crear('td', 'barra'), b = crear('div', 'b'); b.style.width = (100 * f.n / n0) + '%'; c.appendChild(b); r.appendChild(c);
-      tb.appendChild(r);
-    });
-    t.appendChild(tb); $('flujo').appendChild(t);
+  // ---------------------------------------------------------------- índice con la sección activa
+  (function () {
+    var enlaces = {}; document.querySelectorAll('.indice a').forEach(function (a) { enlaces[a.getAttribute('href').slice(1)] = a; });
+    if (!('IntersectionObserver' in window)) return;
+    var visibles = {};
+    var obs = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { visibles[e.target.id] = e.isIntersecting; });
+      var activo = null;
+      document.querySelectorAll('.capitulo').forEach(function (s) { if (!activo && visibles[s.id]) activo = s.id; });
+      Object.keys(enlaces).forEach(function (k) { enlaces[k].classList.toggle('activo', k === activo); });
+      if (activo && window.innerWidth <= 1000) { var a = enlaces[activo]; a.parentNode.parentNode.scrollLeft = a.offsetLeft - 16; }
+    }, { rootMargin: '-15% 0px -70% 0px' });
+    document.querySelectorAll('.capitulo').forEach(function (s) { obs.observe(s); });
   })();
 
-  var dims = [['nivel', 'Nivel educacional'], ['sexo', 'Sexo'], ['tam', 'Tamaño de empresa']];
-  function nombreGrupo(k) { return k === 'total' ? 'Toda la muestra' : k.split('|')[1]; }
-  function opciones(sel, primera) {
-    sel.appendChild(new Option(primera[1], primera[0]));
-    dims.forEach(function (d) {
-      var og = document.createElement('optgroup'); og.label = d[1];
-      D.categorias.filter(function (c) { return c.variable === d[1]; }).forEach(function (c) { og.appendChild(new Option(c.categoria, d[0] + '|' + c.categoria)); });
-      sel.appendChild(og);
+  // ================================================================= histogramas genéricos
+  // barras: [{a, b, v}] con v en la unidad del eje y
+  function barras(L, x, y, bs, color, at) {
+    var g = el('g', null, L.g);
+    bs.forEach(function (b) {
+      var x0 = x(b.a), x1 = x(b.b), w = Math.max(0.5, x1 - x0 - (x1 - x0 > 4 ? 1 : 0));
+      if (b.v > 0) el('rect', Object.assign({ x: x0, y: y(b.v), width: w, height: Math.max(0, y(0) - y(b.v)), fill: b.color || color }, at || {}), g);
     });
+    return g;
   }
-  opciones($('sel-grupo'), ['total', 'Toda la muestra']);
-  opciones($('sel-comparar'), ['', 'Sin comparación']);
-  $('sel-comparar').insertBefore(new Option('Toda la muestra', 'total'), $('sel-comparar').children[1]);
-  function resumenGrupo(k) {
-    if (k === 'total') return { n: D.meta.n, media: D.sueldo.media, mediana: D.sueldo.mediana, de: D.sueldo.de };
-    var c = D.categorias.filter(function (x) { return x.categoria === k.split('|')[1]; })[0];
-    return { n: c.n, media: c.media, mediana: c.mediana, de: c.de };
-  }
-  function dibujarHist() {
-    var a = $('sel-grupo').value, b = $('sel-comparar').value;
-    if (b === a) b = '';
-    var ga = D.hist.grupos[a], gb = b ? D.hist.grupos[b] : null, pa = porcentajes(ga), pb = gb ? porcentajes(gb) : null;
-    var maxy = Math.max.apply(null, pa.concat(pb || []).map(function (p) { return p[1]; }));
-    var capas = [{ tipo: 'barras', puntos: pa, ancho: ancho, color: C1, nombre: nombreGrupo(a) }];
-    if (pb) capas.push({ tipo: 'escalon', puntos: pb, ancho: ancho, color: C2, nombre: nombreGrupo(b) });
-    G.xy($('fig-hist'), {
-      alto: 340, descripcion: 'Histograma del sueldo por grupo',
-      x: ejeSueldo, y: { min: 0, max: techo(maxy, maxy > 20 ? 10 : 5), fmt: function (v) { return f0.format(v) + ' %'; } },
-      capas: capas, puntosX: centros,
-      lectura: function (x, i) {
-        var filas = [{ color: C1, valor: pct(pa[i][1]), nombre: nombreGrupo(a) }];
-        if (pb) filas.push({ color: C2, valor: pct(pb[i][1]), nombre: nombreGrupo(b) });
-        return { titulo: tramo(x), filas: filas };
-      },
-      tabla: { cols: ['Tramo de sueldo', nombreGrupo(a) + ' (%)'].concat(pb ? [nombreGrupo(b) + ' (%)'] : []),
-        filas: pa.map(function (p, i) { return [tramo(p[0]), pct(p[1])].concat(pb ? [pct(pb[i][1])] : []); }) }
-    });
-    var nota = 'Sobre $3.025.000, fuera del gráfico: ' + pct(100 * ga.mayor / ga.n) + ' de ' + nombreGrupo(a).toLowerCase();
-    if (gb) nota += ' y ' + pct(100 * gb.mayor / gb.n) + ' de ' + nombreGrupo(b).toLowerCase();
-    $('nota-hist').textContent = nota + '.';
-    var cont = $('resumen-grupos'); cont.textContent = '';
-    cont.appendChild(crear('h3', '', 'Medidas de resumen del sueldo'));
-    var caja = crear('div', 'tabla-ancha'); cont.appendChild(caja);
-    tablaEn(caja, ['Grupo', 'Personas', 'Media', 'Mediana', 'Desviación estándar'], [a].concat(b ? [b] : []).map(function (k) {
-      var r = resumenGrupo(k);
-      return [nombreGrupo(k), f0.format(r.n), pesosMil(r.media * MILLON), pesosMil(r.mediana * MILLON), pesosMil(r.de * MILLON)];
-    }));
-  }
-  $('sel-grupo').addEventListener('change', dibujarHist);
-  $('sel-comparar').addEventListener('change', dibujarHist);
-  registrar('descriptivo', dibujarHist);
-
-  registrar('descriptivo', function () {
-    G.filas($('fig-frecuentes'), {
-      tipo: 'barra', color: C1, anchoEtiqueta: 96, descripcion: 'Los diez sueldos más declarados',
-      filas: D.frecuentes.map(function (f) { return { etiqueta: pesos(f.monto), valor: f.pct, n: f.n }; }),
-      x: { min: 0, max: 25, fmt: function (v) { return f0.format(v) + ' %'; } },
-      etiquetaValor: function (f) { return pct(f.valor); },
-      lectura: function (f) { return { titulo: f.etiqueta, filas: [{ color: C1, valor: pct(f.valor), nombre: 'de la muestra' }], nota: f0.format(f.n) + ' personas' }; },
-      tabla: { cols: ['Sueldo declarado', '% de la muestra', 'Personas'], filas: D.frecuentes.map(function (f) { return [pesos(f.monto), pct(f.pct), f0.format(f.n)]; }) }
-    });
-  });
-
-  var maxPerfil = 0;
-  ['esc', 'edad', 'horas'].forEach(function (v) { D.perfiles[v].forEach(function (p) { maxPerfil = Math.max(maxPerfil, p.media, p.mediana); }); });
-  function dibujarPerfil(fig, clave, titulo, sufijo) {
-    var datos = D.perfiles[clave], xs = datos.map(function (p) { return p.x; });
-    G.xy($(fig), {
-      alto: 280, margenDer: 16, descripcion: 'Sueldo medio y mediano según ' + titulo.toLowerCase(),
-      x: { min: xs[0], max: xs[xs.length - 1], fmt: function (v) { return f0.format(v); }, titulo: titulo },
-      y: { min: 0, max: techo(maxPerfil * MILLON, 500000), fmt: corto },
-      capas: [
-        { tipo: 'linea', nombre: 'Media', color: C1, puntos: datos.map(function (p) { return [p.x, p.media * MILLON]; }) },
-        { tipo: 'linea', nombre: 'Mediana', color: C2, puntos: datos.map(function (p) { return [p.x, p.mediana * MILLON]; }) }
-      ],
-      esquina: 'ρ de Spearman = ' + num(D.spearman[clave], 3),
-      puntosX: xs,
-      lectura: function (x, i) {
-        return { titulo: f0.format(x) + ' ' + sufijo, filas: [{ color: C1, valor: pesosMil(datos[i].media * MILLON), nombre: 'media' }, { color: C2, valor: pesosMil(datos[i].mediana * MILLON), nombre: 'mediana' }], nota: f0.format(datos[i].n) + ' personas' };
-      },
-      tabla: { cols: [titulo, 'Personas', 'Media', 'Mediana'], filas: datos.map(function (p) { return [f0.format(p.x), f0.format(p.n), pesosMil(p.media * MILLON), pesosMil(p.mediana * MILLON)]; }) }
-    });
-  }
-  registrar('descriptivo', function () { dibujarPerfil('fig-perfil-esc', 'esc', 'Años de escolaridad', 'años de escolaridad'); });
-  registrar('descriptivo', function () { dibujarPerfil('fig-perfil-edad', 'edad', 'Edad (años)', 'años'); });
-  registrar('descriptivo', function () { dibujarPerfil('fig-perfil-horas', 'horas', 'Horas semanales', 'horas semanales'); });
-
-  registrar('descriptivo', function () {
-    var filas = D.cajas.map(function (c) {
-      return { grupo: c.variable, etiqueta: c.categoria, p10: c.p10 * MILLON, p25: c.p25 * MILLON, p50: c.p50 * MILLON, p75: c.p75 * MILLON, p90: c.p90 * MILLON, n: c.n };
-    });
-    var xmax = techo(Math.max.apply(null, filas.map(function (f) { return f.p90; })), 500000);
-    G.filas($('fig-cajas'), {
-      tipo: 'caja', color: C1, anchoEtiqueta: 170, margenDer: 20, altoFila: 32, descripcion: 'Percentiles del sueldo según variables categóricas',
-      filas: filas, x: { min: 0, max: xmax, fmt: corto, titulo: 'Sueldo líquido mensual' },
-      lectura: function (f) { return { titulo: f.etiqueta, filas: [{ color: C1, valor: pesosMil(f.p50), nombre: 'mediana' }, { valor: pesosMil(f.p25) + ' a ' + pesosMil(f.p75), nombre: 'percentiles 25 a 75' }, { valor: pesosMil(f.p10) + ' a ' + pesosMil(f.p90), nombre: 'percentiles 10 a 90' }], nota: f0.format(f.n) + ' personas' }; },
-      tabla: { cols: ['Categoría', 'Personas', 'Percentil 10', 'Percentil 25', 'Mediana', 'Percentil 75', 'Percentil 90'], filas: filas.map(function (f) { return [f.etiqueta, f0.format(f.n), pesosMil(f.p10), pesosMil(f.p25), pesosMil(f.p50), pesosMil(f.p75), pesosMil(f.p90)]; }) }
-    });
-  });
-
-  /* ============================ HISTOGRAMAS DE RESIDUOS ============================ */
-  var HF = D.hist_fino, KS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100], K_FD = 7;
-  var VENT = { amplia: [-0.75, 3.4], centro: [-0.4, 1.0] };
-  function anchoTexto(k) { return pesos(k * HF.base * MILLON) + (k === 9 ? ' (Freedman-Diaconis)' : ''); }
-  /* agrupa los tramos finos (anclados en cero) de k en k: devuelve [x0, x1, densidad] */
-  function agrupar(h, k, nTot, base, i0) {
-    var w = k * base, out = {}, orden = [];
-    for (var j = 0; j < h.length; j++) {
-      var g = Math.floor((i0 + j) / k);
-      if (out[g] == null) { out[g] = 0; orden.push(g); }
-      out[g] += h[j];
+  // agrega conteos de tramos de 10 mil (k/100, (k+1)/100] en tramos de ancho w (millones) anclados en cero
+  function reagrupar(h, w, lo, hi) {
+    var paso = Math.round(w * 100), out = [], k0 = h.k0;
+    var a = Math.ceil(lo * 100 / paso) * paso, b = Math.floor(hi * 100 / paso) * paso;
+    for (var k = a; k < b; k += paso) {
+      var c = 0;
+      for (var j = k; j < k + paso; j++) { var i = j - k0; if (i >= 0 && i < h.c.length) c += h.c[i]; }
+      out.push({ a: k / 100, b: (k + paso) / 100, c: c });
     }
-    return orden.map(function (g) { return [g * w, (g + 1) * w, out[g] / (nTot * w)]; });
+    return out;
   }
-  function curva(fn, lim, pasos) {
-    var pts = [], d = (lim[1] - lim[0]) / pasos, cero = false;
-    for (var i = 0; i <= pasos; i++) {
-      var x = lim[0] + i * d;
-      if (!cero && x > 0) { pts.push([0, fn(0)]); pts.push([1e-9, fn(1e-9)]); cero = true; }
-      pts.push([x, fn(x)]);
+
+  // ================================================================= PORTADA
+  (function () {
+    var H = D.hist_portada, cont = plot('f-portada');
+    var bs = H.c.map(function (c, i) { return { a: H.bordes[i], b: H.bordes[i + 1], c: c, v: 100 * c / N }; });
+    G.adaptable(cont, function () {
+      cont.innerHTML = '';
+      var L = G.lienzo(cont, { alto: function (w) { return Math.max(270, Math.min(450, w * 0.66)); }, m: { t: 62, r: 14, b: 40, l: 40 },
+        etiqueta: 'Histograma del sueldo líquido mensual' });
+      var x = G.escala(-0.075, 4.025, 0, L.w), ym = max(bs.map(function (b) { return b.v; }));
+      var y = G.escala(0, Math.ceil(ym / 5) * 5, L.h, 0);
+      G.ejeY(L, y, { formato: function (v) { return F.num(v) + ' %'; }, n: 4 });
+      G.ejeX(L, x, { ticks: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4], formato: function (v) { return v === 0 ? '0' : F.num(v, v % 1 ? 1 : 0); }, titulo: 'Millones de pesos' });
+      bs.forEach(function (b) { b.color = (b.a < 0.5 && b.b >= 0.5) ? C.naranja : '#7f8a97'; });
+      var gb = barras(L, x, y, bs, '#7f8a97');
+      var marcas = [{ v: 0.5, t: 'Moda', m: '$500.000', c: '#f5a54a', yl: -44, ancla: 'end', dx: -6 },
+        { v: D.continuas[0].mediana, t: 'Mediana', m: '$600.000', c: '#ffffff', yl: -26, ancla: 'start', dx: 6 },
+        { v: D.continuas[0].media, t: 'Media', m: '$877.000', c: '#9cc3ea', yl: -8, ancla: 'start', dx: 6 }];
+      marcas.forEach(function (mk) {
+        el('line', { x1: x(mk.v), x2: x(mk.v), y1: mk.yl - 4, y2: L.h, stroke: mk.c, 'stroke-width': 1.5, 'stroke-dasharray': mk.t === 'Moda' ? null : '4 3' }, L.g);
+        var t = tx(L.g, x(mk.v) + mk.dx, mk.yl, '', { 'text-anchor': mk.ancla, 'class': 'etq', fill: mk.c, style: 'fill:' + mk.c });
+        var s1 = el('tspan', { 'font-weight': 600 }, t); s1.textContent = mk.t + ' ';
+        var s2 = el('tspan', null, t); s2.textContent = mk.m;
+      });
+      var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
+      G.conTip(hov, function (ev) {
+        var p = L.svg.getBoundingClientRect(), xv = x.inv((ev.clientX - p.left) * L.ancho / p.width - L.m.l);
+        var b = bs.filter(function (q) { return xv > q.a && xv <= q.b; })[0]; if (!b) return '';
+        return G.filas([['Más de ' + F.pesos(b.a * 1e6) + ' y hasta ' + F.pesos(b.b * 1e6)], ['Personas', F.num(b.c)], ['Porcentaje', F.pct(b.v)]]);
+      });
+    });
+    $('portada-nota').textContent = 'Los sueldos sobre el percentil 99 quedan fuera del gráfico.';
+  })();
+
+  // ================================================================= 1. DATOS
+  // ---- flujo muestral
+  (function () {
+    var cont = plot('f-flujo'), fl = D.flujo;
+    G.adaptable(cont, function () {
+      cont.innerHTML = '';
+      var fila = 40, L = G.lienzo(cont, { alto: fl.length * fila + 6, m: { t: 2, r: 70, b: 4, l: 0 }, etiqueta: 'Personas que cumplen cada criterio de selección' });
+      var x = G.escala(0, fl[0].n, 0, L.w);
+      fl.forEach(function (f, i) {
+        var y0 = i * fila, ult = i === fl.length - 1;
+        tx(L.g, 0, y0 + 13, f.paso + '  ' + f.criterio, { 'class': ult ? 'etq' : 'etq-2', 'font-weight': ult ? 600 : 400 });
+        var r = el('rect', { x: 0, y: y0 + 19, width: Math.max(1, x(f.n)), height: 13, rx: 2, fill: ult ? C.mco : C.obs }, L.g);
+        tx(L.g, x(f.n) + 6, y0 + 30, F.num(f.n), { 'class': 'etq', 'font-weight': ult ? 600 : 400 });
+        G.conTip(r, function () { return G.filas([[f.criterio], ['Personas', F.num(f.n)], f.excluidos !== null ? ['Excluidas', F.num(f.excluidos)] : null, f.sin_dato !== null ? ['Sin dato', F.num(f.sin_dato)] : null]); });
+      });
+    });
+    G.tabla(tablaFig('f-flujo'), ['Paso', 'Criterio', 'Personas', 'Excluidas', 'Sin dato'],
+      fl.map(function (f) { return [f.paso, f.criterio, F.num(f.n), f.excluidos === null ? '' : F.num(f.excluidos), f.sin_dato === null ? '' : F.num(f.sin_dato)]; }), { txt: [1] });
+  })();
+
+  // ---- histograma por grupo
+  (function () {
+    var HG = D.hist_grupos, cont = plot('f-hist'), sg = $('h-grupo'), sc = $('h-comp');
+    var grupos = [['Toda la muestra', ['Todos']], ['Nivel educacional', NIV], ['Sexo', ['Mujer', 'Hombre']], ['Tamaño de empresa', TAM]];
+    function opciones(sel, ninguno) {
+      var h = ninguno ? '<option value="">Ningún grupo</option>' : '';
+      grupos.forEach(function (g) { h += '<optgroup label="' + g[0] + '">' + g[1].map(function (k) { return '<option value="' + k + '">' + (k === 'Todos' ? 'Toda la muestra' : k) + '</option>'; }).join('') + '</optgroup>'; });
+      sel.innerHTML = h;
     }
-    return pts;
-  }
-  function maxVentana(barras, cur, lim) {
-    var m = 0;
-    barras.forEach(function (b) { if (b[1] > lim[0] && b[0] < lim[1]) m = Math.max(m, b[2]); });
-    cur.forEach(function (p) { m = Math.max(m, p[1]); });
-    return m;
-  }
-  function panelResiduos(fig, barras, cur, lim, ymax, o) {
-    var visibles = barras.filter(function (b) { return b[1] > lim[0] && b[0] < lim[1]; });
-    G.xy(fig, {
-      alto: o.alto || 190, descripcion: o.descripcion, margen: { l: 34, r: 8, b: o.tituloX ? 40 : 24 },
-      x: { min: lim[0], max: lim[1], fmt: function (v) { return num(v, Math.abs(lim[1] - lim[0]) < 1 ? 2 : 1); }, titulo: o.tituloX || null, marcas: o.marcasX || null },
-      y: { min: 0, max: ymax, fmt: function (v) { return num(v, ymax < 2 ? 1 : 0); } },
-      capas: [{ tipo: 'hist', puntos: visibles, color: BARRA }, { tipo: 'linea', color: o.color || C1, puntos: cur, grosor: 2 }],
-      marcasX: [{ x: 0, color: TENUE }],
-      esquina: o.esquina, esquina2: o.esquina2,
-      puntosX: visibles.map(function (b) { return (b[0] + b[1]) / 2; }),
-      lectura: function (xv, i) {
-        var b = visibles[i];
-        return { titulo: 'Residuo de ' + pesos(b[0] * MILLON) + ' a ' + pesos(b[1] * MILLON), filas: [{ color: BARRA, valor: num(b[2], 3), nombre: 'densidad observada' }, { color: o.color || C1, valor: num(o.fn(xv), 3), nombre: 'densidad ajustada' }] };
+    opciones(sg, false); opciones(sc, true); sg.value = 'Profesional completo'; sc.value = 'Media completa';
+    function nombre(k) { return k === 'Todos' ? 'Toda la muestra' : k; }
+    function bins(k) { var h = HG.grupos[k]; return h.c.map(function (c, i) { return { a: HG.bordes[i], b: HG.bordes[i + 1], c: c, v: 100 * c / h.n }; }); }
+    function dibujar() {
+      cont.innerHTML = '';
+      var a = sg.value, b = sc.value, A = bins(a), B = b ? bins(b) : null;
+      var L = G.lienzo(cont, { alto: function (w) { return Math.max(250, Math.min(380, w * 0.36)); }, m: { t: 14, r: 10, b: 40, l: 44 } });
+      var ym = max(A.map(function (q) { return q.v; }).concat(B ? B.map(function (q) { return q.v; }) : []));
+      var x = G.escala(-0.025, 3.025, 0, L.w), y = G.escala(0, ym * 1.05, L.h, 0);
+      G.ejeY(L, y, { formato: function (v) { return F.num(v) + ' %'; }, n: 4 });
+      G.ejeX(L, x, { ticks: [0, 0.5, 1, 1.5, 2, 2.5, 3], formato: function (v) { return F.num(v, v % 1 ? 1 : 0); }, titulo: 'Millones de pesos' });
+      barras(L, x, y, A, '#9aa4b0');
+      if (B) {
+        var pts = []; B.forEach(function (q) { pts.push([q.a, q.v], [q.b, q.v]); });
+        G.linea(L, pts, x, y, { stroke: C.tinta, 'stroke-width': 1.6 });
       }
-    });
-  }
-
-  /* ============================ COMPARACIÓN DE MODELOS ============================ */
-  var esp = 'B', cmpK = K_FD, cmpVent = 'amplia';
-  function modelosDe(e) { return D.modelos20.filter(function (m) { return m.esp === e; }); }
-  function densidad20(m) { return function (r) { return MOD.densidadError(m.fam, r, m.sigma, m.alpha, m.nu, m.tau); }; }
-  function tablaComparacion() {
-    var ms = modelosDe(esp), minBic = Math.min.apply(null, ms.map(function (m) { return m.bic; }));
-    tablaEn($('tabla-comparacion'), ['Distribución', 'Versión', 'm', 'ℓ', 'AIC', 'BIC', 'σ', 'α', 'ν', 'Bajo la moda: modelo', 'observado'], ms.map(function (m) {
-      var fam = D.familias.filter(function (f) { return f.clave === m.fam; })[0].nombre;
-      var nu = m.nu == null ? '' : (m.tau == null ? num(m.nu, 3) : num(m.nu, 3) + '; τ = ' + num(m.tau, 3));
-      return [fam + (m.sel ? ' (modelo seleccionado)' : ''), { t: m.tipo === 'TP' ? 'Dos piezas' : 'Simétrica', izq: true }, String(m.m), num(m.loglik, 2), num(m.aic, 2), { t: num(m.bic, 2), fuerte: m.bic === minBic },
-        num(m.sigma, 4), m.tipo === 'TP' ? num(m.alpha, 3) : '0', nu, pct(100 * m.prop_bajo), pct(100 * m.prop_obs)];
-    }), function (k) { return ms[k].sel ? 'elegido' : (ms[k].tipo === 'TP' ? 'par-tp' : ''); }, 'compacta');
-  }
-  function figBic() {
-    var ms = modelosDe(esp), filas = D.familias.map(function (f) {
-      var s = ms.filter(function (m) { return m.fam === f.clave && m.tipo === 'SMN'; })[0], t = ms.filter(function (m) { return m.fam === f.clave && m.tipo === 'TP'; })[0];
-      return { etiqueta: f.nombre, valores: [s.bic, t.bic], s: s, t: t };
-    });
-    G.filas($('fig-bic'), {
-      tipo: 'barra', anchoEtiqueta: 150, margenDer: 24, descripcion: 'BIC de los modelos simétricos y de dos piezas',
-      series: [{ nombre: 'Simétrica (SMN)', color: C2 }, { nombre: 'Dos piezas (TP-SMN)', color: C1 }],
-      filas: filas, x: { min: 0, max: 100000, fmt: function (v) { return f0.format(v); }, titulo: 'BIC (menor es mejor)' },
-      lectura: function (f) { return { titulo: f.etiqueta, filas: [{ color: C2, valor: num(f.valores[0], 2), nombre: 'BIC simétrica' }, { color: C1, valor: num(f.valores[1], 2), nombre: 'BIC dos piezas' }], nota: 'Diferencia: ' + num(f.valores[0] - f.valores[1], 2) }; },
-      tabla: { cols: ['Distribución', 'BIC simétrica', 'BIC dos piezas', 'Diferencia'], filas: filas.map(function (f) { return [f.etiqueta, num(f.valores[0], 2), num(f.valores[1], 2), num(f.valores[0] - f.valores[1], 2)]; }) }
-    });
-  }
-  var figsModelos = null;
-  function panelModelos() {
-    var cont = $('panel-modelos'), ms = modelosDe(esp), lim = VENT[cmpVent], k = KS[cmpK];
-    if (!figsModelos) {
-      figsModelos = {};
-      D.familias.forEach(function (f) { ['SMN', 'TP'].forEach(function (t) { figsModelos[f.clave + t] = figuraMini(cont, ''); }); });
+      var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
+      G.conTip(hov, function (ev) {
+        var p = L.svg.getBoundingClientRect(), xv = x.inv((ev.clientX - p.left) * L.ancho / p.width - L.m.l), i = A.findIndex(function (q) { return xv > q.a && xv <= q.b; });
+        if (i < 0) return '';
+        return G.filas([['Más de ' + F.pesos(A[i].a * 1e6) + ' y hasta ' + F.pesos(A[i].b * 1e6)], [nombre(a), F.pct(A[i].v)], B ? [nombre(b), F.pct(B[i].v)] : null]);
+      });
+      G.claves(ley('f-hist'), [{ tipo: 'barra', color: '#9aa4b0', texto: nombre(a) + ' (' + F.num(HG.grupos[a].n) + ' personas)' }].concat(B ? [{ tipo: 'linea', color: C.tinta, texto: nombre(b) + ' (' + F.num(HG.grupos[b].n) + ')' }] : []));
+      var fa = 100 * HG.grupos[a].mayor / HG.grupos[a].n;
+      $('h-nota').textContent = 'Queda fuera del gráfico el ' + F.pct(fa) + ' de ' + nombre(a).toLowerCase().replace('toda la muestra', 'la muestra') + ', con sueldos mayores que $3.025.000' + (B ? '; en ' + nombre(b).toLowerCase() + ', el ' + F.pct(100 * HG.grupos[b].mayor / HG.grupos[b].n) : '') + '.';
+      var tb = A.map(function (q, i) { return [F.pesos(q.a * 1e6 + 25000), F.pct(q.v)].concat(B ? [F.pct(B[i].v)] : []); });
+      G.tabla(tablaFig('f-hist'), ['Tramo centrado en', nombre(a)].concat(B ? [nombre(b)] : []), tb);
     }
-    var prep = ms.map(function (m) {
-      var fn = densidad20(m), barras = agrupar(m.h.c, k, D.meta.n, HF.base, HF.i0), cur = curva(fn, lim, 260);
-      return { m: m, fn: fn, barras: barras, cur: cur, max: maxVentana(barras, cur, lim) };
-    });
-    var ymax = Math.max.apply(null, prep.map(function (p) { return p.max; })) * 1.04;
-    prep.forEach(function (p, idx) {
-      var m = p.m, fig = figsModelos[m.fam + m.tipo], fam = D.familias.filter(function (f) { return f.clave === m.fam; })[0].nombre;
-      fig.querySelector('h4').textContent = fam + ' · ' + (m.tipo === 'TP' ? 'dos piezas' : 'simétrica') + (m.sel ? ' · modelo seleccionado' : '');
-      fig.classList.toggle('destacada', !!m.sel);
-      panelResiduos(fig, p.barras, p.cur, lim, ymax, { fn: p.fn, color: m.tipo === 'TP' ? C1 : C2, esquina: 'BIC ' + num(m.bic, 0),
-        tituloX: idx >= 8 ? 'Residuo (millones de pesos)' : null, descripcion: 'Residuos y densidad ajustada: ' + fam + ', ' + m.tipo });
-    });
-    $('cmp-ancho-out').textContent = anchoTexto(k);
-    $('cmp-nota').textContent = 'Con ' + pesos(k * HF.base * MILLON) + ' por barra hay ' + f0.format(Math.round((lim[1] - lim[0]) / (k * HF.base))) + ' barras en la ventana. Los diez paneles usan los mismos ejes. Cambiar el ancho no modifica el ajuste: una barra más ancha promedia más observaciones.';
-  }
-  function dibujarComparacion() { tablaComparacion(); figBic(); panelModelos(); }
-  radio('esp', function (v) { esp = v; dibujarComparacion(); });
-  radio('vent', function (v) { cmpVent = v; panelModelos(); });
-  $('cmp-ancho').addEventListener('input', function (ev) { cmpK = +ev.target.value; panelModelos(); });
-  $('cmp-fd').addEventListener('click', function () { cmpK = K_FD; $('cmp-ancho').value = K_FD; panelModelos(); });
-  registrar('comparacion', dibujarComparacion);
-  (function tablaModelos() {
-    var bic = {}; D.ajuste.forEach(function (a) { bic[a.modelo] = a.bic; });
-    tablaEn($('tabla-modelos'), ['Modelo', 'BIC', 'Asimetría', 'Curtosis', '|Residuo| > 2', '|Residuo| > 3'], D.residuos_modelo.map(function (r) {
-      var nombre = r.modelo.replace(' (MCO)', ''), b = bic[nombre];
-      var etiqueta = r.modelo === 'TP-t' ? 'TP-t (modelo seleccionado)' : r.modelo.replace('Referencia N(0, 1)', 'Referencia: normal estándar');
-      return [etiqueta, b ? num(b, 0) : '', num(r.asimetria, 3), num(r.curtosis, 3), pct(r.pct2, 2), pct(r.pct3, 2)];
-    }), function (k) { return D.residuos_modelo[k].modelo === 'TP-t' ? 'elegido' : ''; }, 'compacta');
+    sg.addEventListener('change', dibujar); sc.addEventListener('change', dibujar);
+    G.adaptable(cont, dibujar);
   })();
 
-  /* ============================ DISTRIBUCIÓN CONDICIONAL ============================ */
-  var perfiles = {
-    a: { nivel: 'Media completa', edad: 40, horas: 44, sexo: 'Mujer', tam: 'Micro (1 a 9)' },
-    b: { nivel: 'Profesional completo', edad: 40, horas: 44, sexo: 'Mujer', tam: 'Micro (1 a 9)' }
-  };
-  var comparar = false, simMod = 'M0';
-  function modeloPerfil(p) { return modeloDe(simMod, NIV.indexOf(p.nivel)); }
-
-  function formulario(clave, titulo) {
-    var cont = $('perfil-' + clave), p = perfiles[clave];
-    cont.appendChild(crear('h3', '', titulo));
-    function campoSelect(rot, lista, prop) {
-      var l = crear('label', 'campo'); l.appendChild(crear('span', '', rot));
-      var sel = document.createElement('select');
-      lista.forEach(function (o) { sel.appendChild(new Option(o, o)); });
-      sel.value = p[prop];
-      sel.addEventListener('change', function () { p[prop] = sel.value; if (prop === 'sexo') ajustarEdad(); actualizar(); });
-      l.appendChild(sel); cont.appendChild(l); return sel;
-    }
-    function campoRango(rot, prop, min, max, unidad) {
-      var l = crear('label', 'campo'); l.appendChild(crear('span', '', rot));
-      var fila = crear('span', 'rango-fila'), r = document.createElement('input'), out = document.createElement('output');
-      r.type = 'range'; r.min = min; r.max = max; r.step = 1; r.value = p[prop];
-      out.textContent = p[prop] + ' ' + unidad;
-      r.addEventListener('input', function () { p[prop] = +r.value; out.textContent = r.value + ' ' + unidad; actualizar(); });
-      fila.appendChild(r); fila.appendChild(out); l.appendChild(fila); cont.appendChild(l);
-      return { rango: r, salida: out };
-    }
-    campoSelect('Nivel educacional', D.niveles, 'nivel');
-    var edad = campoRango('Edad', 'edad', D.rangos.edad[0], D.rangos.edad[1], 'años');
-    campoRango('Horas semanales', 'horas', D.rangos.horas[0], D.rangos.horas[1], 'horas');
-    campoSelect('Sexo', ['Mujer', 'Hombre'], 'sexo');
-    campoSelect('Tamaño de la empresa', D.tamanos, 'tam');
-    function ajustarEdad() {
-      var max = p.sexo === 'Mujer' ? D.rangos.edad_mujer_max : D.rangos.edad[1];
-      edad.rango.max = max;
-      if (p.edad > max) { p.edad = max; edad.rango.value = max; edad.salida.textContent = max + ' años'; }
-    }
-    ajustarEdad();
-  }
-  formulario('a', 'Perfil A');
-  formulario('b', 'Perfil B');
-  $('chk-comparar').addEventListener('change', function (ev) { comparar = ev.target.checked; $('perfil-b').hidden = !comparar; actualizar(); });
-  $('monto').addEventListener('input', actualizar);
-  radio('sim-mod', function (v) { simMod = v; actualizar(); });
-
-  function tarjeta(clave, Mx, mu) {
-    var d = crear('div', 'res ' + clave);
-    d.appendChild(crear('div', 'res-rot', (comparar ? 'Perfil ' + clave.toUpperCase() + ': m' : 'M') + 'oda condicional del sueldo'));
-    d.appendChild(crear('div', 'res-moda', pesosMil(mu * MILLON)));
-    var dl = crear('dl');
-    [['Mediana condicional', pesosMil((mu + Mx.cuantil(0.5)) * MILLON)],
-      ['Percentiles 25 a 75', pesosMil((mu + Mx.cuantil(0.25)) * MILLON) + ' a ' + pesosMil((mu + Mx.cuantil(0.75)) * MILLON)],
-      ['Percentiles 10 a 90', pesosMil((mu + Mx.cuantil(0.10)) * MILLON) + ' a ' + pesosMil((mu + Mx.cuantil(0.90)) * MILLON)],
-      ['Proporción bajo la moda', pct(50 * (1 + Mx.alpha))]
-    ].forEach(function (f) { dl.appendChild(crear('dt', '', f[0])); dl.appendChild(crear('dd', '', f[1])); });
-    d.appendChild(dl);
-    return d;
-  }
-  var LECTURA_SIM = {
-    M0: ['En M0 la escala y la asimetría son comunes: cambiar el perfil desplaza la curva completa sin cambiar su forma.',
-      'El diagnóstico muestra que esa forma común no describe bien todos los niveles educacionales; M1 y M3 la hacen depender del nivel.'],
-    M1: ['En M1 cada nivel educacional tiene su propia escala: la curva se ensancha al subir el nivel, con la misma asimetría en todos.',
-      'El nivel educacional desplaza la moda, como en M0, y además cambia la dispersión.'],
-    M3: ['En M3 cada nivel educacional tiene su propia escala y su propia asimetría: cambian la dispersión y la proporción de sueldos bajo la moda.',
-      'La moda de los seis primeros niveles queda cerca de $500.000, el sueldo más repetido de la muestra; la diferencia entre niveles se observa en la mediana y en la cola derecha.']
-  };
-  var COMUN_SIM = ['La cola derecha del modelo es más pesada que la de los datos; por eso no se muestran percentiles más allá del 10 y el 90.',
-    'Las cifras describen la muestra de la Casen 2024 sin factores de expansión; no son una predicción del sueldo de una persona.'];
-  function actualizar() {
-    if (activa !== 'condicional') return;
-    var MA = modeloPerfil(perfiles.a), MB = comparar ? modeloPerfil(perfiles.b) : null;
-    var muA = MA.moda(perfiles.a), muB = comparar ? MB.moda(perfiles.b) : null, monto = +$('monto').value;
-    var res = $('resultados'); res.textContent = ''; res.className = 'resultados' + (comparar ? '' : ' uno');
-    res.appendChild(tarjeta('a', MA, muA));
-    if (comparar) res.appendChild(tarjeta('b', MB, muB));
-    var altos = ['Profesional completo', 'Postgrado completo'], hayAlto = altos.indexOf(perfiles.a.nivel) >= 0 || (comparar && altos.indexOf(perfiles.b.nivel) >= 0);
-    var aviso = '';
-    if (simMod === 'M0' && hayAlto) aviso = 'Con escala y asimetría comunes (M0), el modelo ajusta peor en profesional completo y postgrado completo: sus residuos tienen la mayor dispersión.';
-    if (simMod === 'M3') aviso = 'En M3 la moda condicional no es un sueldo representativo de los niveles altos: en profesional completo solo el ' + valores.x_pb_pro + ' de la distribución queda bajo ella. Use la mediana condicional para describir un sueldo representativo.';
-    $('aviso-nivel').hidden = !aviso; $('aviso-texto').textContent = aviso;
-    var ul = $('lectura-sim'); ul.textContent = '';
-    LECTURA_SIM[simMod].concat(COMUN_SIM).forEach(function (t) { ul.appendChild(crear('li', '', t)); });
-
-    var fin = Math.max(muA + MA.cuantil(0.93), comparar ? muB + MB.cuantil(0.93) : 0, Math.max(muA, muB || 0) + 1.0);
-    var xmax = Math.min(8e6, techo(fin * MILLON, 500000)), paso = xmax > 4e6 ? 20000 : 10000, xs = [];
-    for (var x = 0; x <= xmax; x += paso) xs.push(x);
-    var curvaP = function (Mx, mu) { return xs.map(function (v) { return [v, Mx.densidad(v / MILLON, mu)]; }); };
-    var capas = [{ tipo: 'linea', area: true, nombre: comparar ? 'Perfil A' : null, color: C1, puntos: curvaP(MA, muA) }];
-    var marcas = [{ x: muA * MILLON, texto: (comparar ? 'Moda A: ' : 'Moda: ') + pesosMil(muA * MILLON), nivel: 0, color: C1 }];
-    if (comparar) {
-      capas.push({ tipo: 'linea', area: true, nombre: 'Perfil B', color: C2, puntos: curvaP(MB, muB) });
-      marcas.push({ x: muB * MILLON, texto: 'Moda B: ' + pesosMil(muB * MILLON), nivel: 1, color: C2 });
-    }
-    marcas.push({ x: monto, texto: 'Monto: ' + corto(monto), nivel: comparar ? 2 : 1, color: TENUE });
-    var cima = Math.max(MA.densidad(muA, muA), comparar ? MB.densidad(muB, muB) : 0) * 1.06;
-    $('monto').max = xmax;
-    G.xy($('fig-sim'), {
-      alto: 340, descripcion: 'Densidad condicional del sueldo según el modelo para cada perfil',
-      x: { min: 0, max: xmax, fmt: corto, titulo: 'Sueldo líquido mensual', marcas: null },
-      y: { min: 0, max: cima, sinEtiquetas: true, marcas: [0] },
-      capas: capas, marcasX: marcas, puntosX: xs, inicioTeclado: Math.round(muA * MILLON / paso),
-      lectura: function (xv) {
-        var filas = [{ color: C1, valor: pct(100 * MA.acumulada(xv / MILLON, muA)), nombre: (comparar ? 'del perfil A ' : '') + 'bajo ese sueldo' }];
-        if (comparar) filas.push({ color: C2, valor: pct(100 * MB.acumulada(xv / MILLON, muB)), nombre: 'del perfil B bajo ese sueldo' });
-        return { titulo: pesos(xv), filas: filas };
-      },
-      tabla: (function () {
-        var filas = [['Moda', null], ['Percentil 10', 0.10], ['Percentil 25', 0.25], ['Mediana', 0.50], ['Percentil 75', 0.75], ['Percentil 90', 0.90]].map(function (f) {
-          var va = muA + (f[1] == null ? 0 : MA.cuantil(f[1])), fila = [f[0], pesosMil(va * MILLON)];
-          if (comparar) { var vb = muB + (f[1] == null ? 0 : MB.cuantil(f[1])); fila.push(pesosMil(vb * MILLON), pesosMil((vb - va) * MILLON)); }
-          return fila;
-        });
-        var ult = ['Supera ' + pesos(monto), pct(100 * MA.supera(monto / MILLON, muA))];
-        if (comparar) ult.push(pct(100 * MB.supera(monto / MILLON, muB)), '');
-        filas.push(ult);
-        return { cols: ['Medida', comparar ? 'Perfil A' : 'Perfil'].concat(comparar ? ['Perfil B', 'Diferencia (B − A)'] : []), filas: filas };
-      })()
-    });
-    $('monto-out').textContent = corto(monto);
-    var mr = $('monto-res'); mr.textContent = '';
-    var linea = function (et, Mx, mu) {
-      var pline = crear('div'); pline.appendChild(crear('strong', '', pct(100 * Mx.supera(monto / MILLON, mu))));
-      pline.appendChild(document.createTextNode(' ' + et + ' supera ' + pesos(monto)));
-      mr.appendChild(pline);
-    };
-    linea(comparar ? 'del perfil A' : 'de los sueldos de este perfil', MA, muA);
-    if (comparar) linea('del perfil B', MB, muB);
-  }
-  registrar('condicional', actualizar);
-
-  /* ============================ INFERENCIA ============================ */
-  var tipoIC = 'cong', infMod = 'M0';
-  var ETQ = { hombre: 'Hombre', edad: 'Edad', horas: 'Horas semanales', intercepto: 'Intercepto' };
-  function etq(p) { return ETQ[p] || p; }
-  function ic(r) { return tipoIC === 'cong' ? [r.ic_inf, r.ic_sup] : [r.est - 1.96 * r.ee_obs, r.est + 1.96 * r.ee_obs]; }
-  var gruposEf = [['Nivel educacional, respecto de básica o menos', [1, 2, 3, 4, 5, 6]], ['Tamaño de empresa, respecto de microempresa', [10, 11, 12]], ['Sexo, respecto de mujer', [9]]];
-  var NOTA_EF = {
-    M0: 'Modelo seleccionado por BIC entre los 20: escala y asimetría comunes a todos los niveles.',
-    M1: 'Con una escala por nivel, los coeficientes del nivel educacional son similares a los de M0.',
-    M3: 'Con escala y asimetría por nivel, la moda casi no cambia entre los seis primeros niveles; el nivel educacional se asocia con la escala sobre la moda y con la proporción bajo ella (pestaña «Extensión por nivel educacional»).'
-  };
-  function dibujarEfectos() {
-    var inf = F4.coef[infMod], filas = [];
-    gruposEf.forEach(function (g) { g[1].forEach(function (i) { var r = inf[i], c = ic(r); filas.push({ grupo: g[0], etiqueta: etq(r.parametro), valor: r.est * MILLON, inf: c[0] * MILLON, sup: c[1] * MILLON, ee: (tipoIC === 'cong' ? r.ee_cong : r.ee_obs) * MILLON }); }); });
-    G.filas($('fig-efectos'), {
-      tipo: 'rango', color: C1, anchoEtiqueta: 180, margenDer: 96, descripcion: 'Coeficientes de la moda condicional con intervalos de confianza',
-      filas: filas, x: { min: 0, max: 1000000, fmt: corto, titulo: 'Diferencia en la moda condicional del sueldo líquido mensual' },
-      etiquetaValor: function (f) { return pesosMil(f.valor); },
-      lectura: function (f) { return { titulo: f.etiqueta, filas: [{ color: C1, valor: pesosMil(f.valor), nombre: 'en la moda condicional' }], nota: 'Intervalo de 95 %: ' + pesosMil(f.inf) + ' a ' + pesosMil(f.sup) + '. Error estándar: ' + pesosMil(f.ee) }; },
-      tabla: { cols: ['Variable', 'Coeficiente', 'Límite inferior', 'Límite superior', 'Error estándar'], filas: filas.map(function (f) { return [f.etiqueta, pesosMil(f.valor), pesosMil(f.inf), pesosMil(f.sup), pesosMil(f.ee)]; }) }
-    });
-    $('nota-efectos').textContent = NOMBRE_MOD[infMod] + '. ' + NOTA_EF[infMod];
-    var cont = $('efectos-continuas'); cont.textContent = '';
-    [[7, 'Un año más de edad'], [8, 'Una hora semanal más de trabajo']].forEach(function (par) {
-      var r = inf[par[0]], c = ic(r), d = crear('div', 'cifra');
-      d.appendChild(crear('div', 'cifra-rot', par[1]));
-      d.appendChild(crear('div', 'cifra-val', '+' + pesos(r.est * MILLON)));
-      d.appendChild(crear('div', 'cifra-nota', 'en la moda condicional; intervalo de 95 %: ' + pesos(c[0] * MILLON) + ' a ' + pesos(c[1] * MILLON)));
-      cont.appendChild(d);
-    });
-  }
-  radio('ic', function (v) { tipoIC = v; dibujarEfectos(); });
-  radio('inf-mod', function (v) { infMod = v; dibujarEfectos(); });
-  registrar('inferencia', dibujarEfectos);
-  registrar('inferencia', function () {
-    var filas = [], inf = D.inferencia;
-    gruposEf.forEach(function (g) { g[1].forEach(function (i) { filas.push({ grupo: g[0].split(',')[0], etiqueta: inf[i].parametro, valores: [inf[i].est * MILLON, D.mco[i].est * MILLON] }); }); });
-    G.filas($('fig-mco'), {
-      tipo: 'barra', anchoEtiqueta: 180, margenDer: 24, descripcion: 'Coeficientes de la moda (modelo de dos piezas) y de la media (mínimos cuadrados)',
-      series: [{ nombre: 'Moda (t de dos piezas, M0)', color: C1 }, { nombre: 'Media (mínimos cuadrados ordinarios)', color: C2 }],
-      filas: filas, x: { min: 0, max: 2000000, fmt: corto, titulo: 'Diferencia respecto de la categoría de referencia' },
-      lectura: function (f) { return { titulo: f.etiqueta, filas: [{ color: C1, valor: pesosMil(f.valores[0]), nombre: 'en la moda' }, { color: C2, valor: pesosMil(f.valores[1]), nombre: 'en la media' }] }; },
-      tabla: { cols: ['Variable', 'Moda (t de dos piezas)', 'Media (mínimos cuadrados)'], filas: filas.map(function (f) { return [f.etiqueta, pesosMil(f.valores[0]), pesosMil(f.valores[1])]; }) }
-    });
-  });
-
-  /* ============================ DIAGNÓSTICO ============================ */
-  registrar('diagnostico', function () {
-    var xs = [], pts = [];
-    for (var r = -500000; r <= 2000000; r += 10000) { xs.push(r); pts.push([r, M.peso(r / MILLON)]); }
-    G.xy($('fig-peso-curva'), {
-      alto: 320, descripcion: 'Peso de una observación según su distancia a la moda',
-      x: { min: -500000, max: 2000000, fmt: corto, titulo: 'Distancia entre el sueldo y la moda condicional', marcas: [-500000, 0, 500000, 1000000, 1500000, 2000000] },
-      y: { min: 0, max: 2, fmt: function (v) { return num(v, 1); }, marcas: [0, 0.5, 1, 1.5, 2] },
-      capas: [{ tipo: 'linea', area: true, color: C1, puntos: pts }],
-      refY: [{ y: 0.5, texto: 'Peso ½' }],
-      marcasX: [{ x: um.izq * MILLON, texto: valores.umbral_izq + ' bajo la moda', nivel: 0, color: TENUE }, { x: um.der * MILLON, texto: valores.umbral_der + ' sobre la moda', nivel: 1, color: TENUE }],
-      puntosX: xs, inicioTeclado: 50,
-      lectura: function (xv, i) { return { titulo: xv === 0 ? 'En la moda' : pesos(Math.abs(xv)) + (xv < 0 ? ' bajo la moda' : ' sobre la moda'), filas: [{ color: C1, valor: num(pts[i][1], 2), nombre: 'peso' }] }; },
-      tabla: { cols: ['Distancia a la moda', 'Peso'], filas: pts.filter(function (p) { return p[0] % 100000 === 0; }).map(function (p) { return [pesos(p[0]), num(p[1], 3)]; }) }
-    });
-  });
-  registrar('diagnostico', function () {
-    G.filas($('fig-peso-nivel'), {
-      tipo: 'barra', color: C1, anchoEtiqueta: 150, descripcion: 'Porcentaje de observaciones con peso menor que un medio por nivel educacional',
-      filas: D.pesos_nivel.map(function (p) { return { etiqueta: p.nivel, valor: p.pct_bajo, destacada: p.nivel === 'Total', d: p }; }),
-      x: { min: 0, max: 100, fmt: function (v) { return f0.format(v) + ' %'; } },
-      etiquetaValor: function (f) { return pct(f.valor); },
-      lectura: function (f) { return { titulo: f.etiqueta, filas: [{ color: C1, valor: pct(f.valor), nombre: 'con peso menor que ½' }], nota: 'Peso medio ' + num(f.d.medio, 2) + '; peso mediano ' + num(f.d.mediano, 2) + '; ' + f0.format(f.d.n) + ' personas' }; },
-      tabla: { cols: ['Nivel educacional', 'Personas', 'Peso medio', 'Peso mediano', 'Peso menor que ½'], filas: D.pesos_nivel.map(function (p) { return [p.nivel, f0.format(p.n), num(p.medio, 3), num(p.mediano, 3), pct(p.pct_bajo)]; }) }
-    });
-  });
-  registrar('diagnostico', function () {
-    G.filas($('fig-res-nivel'), {
-      tipo: 'rango', color: C1, anchoEtiqueta: 150, margenDer: 20, descripcion: 'Media y desviación estándar de los residuos cuantílicos por nivel educacional',
-      filas: D.residuos_nivel.map(function (r) { return { etiqueta: r.nivel, valor: r.media, inf: r.media - r.de, sup: r.media + r.de, destacada: r.nivel === 'Total', d: r }; }),
-      x: { min: -2, max: 3, fmt: function (v) { return num(v, 0); }, marcas: [-2, -1, 0, 1, 2, 3], titulo: 'Residuo cuantílico' },
-      refX: [{ x: -1 }, { x: 1 }],
-      lectura: function (f) { return { titulo: f.etiqueta, filas: [{ color: C1, valor: num(f.d.media, 2), nombre: 'media' }, { valor: num(f.d.de, 2), nombre: 'desviación estándar' }], nota: pct(f.d.pct_bajo0) + ' de los residuos es menor o igual que 0; ' + pct(f.d.pct_mayor2) + ' supera 2 en valor absoluto' }; },
-      tabla: { cols: ['Nivel educacional', 'Personas', 'Media', 'Desviación estándar', 'Residuos ≤ 0', '|Residuo| > 2'], filas: D.residuos_nivel.map(function (r) { return [r.nivel, f0.format(r.n), num(r.media, 3), num(r.de, 3), pct(r.pct_bajo0), pct(r.pct_mayor2)]; }) }
-    });
-  });
-
-  /* residuos de un nivel: histograma anclado en cero y densidad del nivel */
-  var NB = [10, 12, 15, 20, 24, 30, 40, 48, 60, 80, 120];
-  function panelNivel(fig, K, k, nBarras, o) {
-    var hn = F4.hist_nivel[K][k], p = F4.modelos[K], sg = Math.sqrt(p.sigma2[k]), al = p.alpha[k], nu = p.nu;
-    var fn = function (r) { return MOD.densidadError('T', r, sg, al, nu); };
-    var lim = [hn.lo, hn.hi], barras = agrupar(hn.c, 240 / nBarras, hn.n, hn.w0, hn.i0), cur = curva(fn, lim, 200);
-    var res = F4.residuos[K][k];
-    panelResiduos(fig, barras, cur, lim, maxVentana(barras, cur, lim) * 1.05, { fn: fn, color: o.color || C1, alto: o.alto || 170,
-      esquina: 'D = ' + num(res.dmax, 3), tituloX: o.tituloX, descripcion: 'Residuos de ' + NIV[k] + ' y densidad ajustada, modelo ' + K });
-  }
-  var figsDiag = null, dgB = 5;
-  function panelDiagNivel() {
-    var cont = $('panel-diag-nivel');
-    if (!figsDiag) figsDiag = NIV.map(function (l) { return figuraMini(cont, l); });
-    figsDiag.forEach(function (fig, k) { panelNivel(fig, 'M0', k, NB[dgB], { tituloX: 'Residuo (millones de pesos)', alto: 190 }); });
-    $('dg-barras-out').textContent = NB[dgB] + ' barras';
-  }
-  $('dg-barras').addEventListener('input', function (ev) { dgB = +ev.target.value; panelDiagNivel(); });
-  registrar('diagnostico', panelDiagNivel);
-  registrar('diagnostico', function () {
-    var c0 = F4.centro.M0, filas = c0.map(function (c) { return { etiqueta: c.nivel, valores: [100 * c.masa_obs, 100 * c.masa_mod], c: c }; });
-    G.filas($('fig-masa'), {
-      tipo: 'barra', anchoEtiqueta: 160, margenDer: 24, descripcion: 'Proporción de residuos cercanos a la moda: observada y según el modelo',
-      series: [{ nombre: 'Observada', color: GRIS }, { nombre: 'Modelo M0', color: C1 }],
-      filas: filas, x: { min: 0, max: 40, fmt: function (v) { return f0.format(v) + ' %'; }, titulo: 'Residuos a menos de $50.000 de la moda' },
-      lectura: function (f) { return { titulo: f.etiqueta, filas: [{ color: GRIS, valor: pct(f.valores[0]), nombre: 'observado' }, { color: C1, valor: pct(f.valores[1]), nombre: 'según M0' }], nota: 'Razón entre la barra más alta del histograma y la densidad en la moda: ' + num(f.c.razon, 2) }; },
-      tabla: { cols: ['Nivel educacional', 'Observado', 'Modelo M0', 'Razón barra más alta / densidad en la moda'], filas: filas.map(function (f) { return [f.etiqueta, pct(f.valores[0]), pct(f.valores[1]), num(f.c.razon, 2)]; }) }
-    });
-  });
-
-  /* ============================ EXTENSIÓN ============================ */
-  var xMod = 'M3', xB = 5, xtK = K_FD, xtVent = 'centro';
-  (function tablaExt() {
-    var desc = { M0: ['Común', 'Común'], M1: ['Por nivel', 'Común'], M2: ['Común', 'Por nivel'], M3: ['Por nivel', 'Por nivel'] };
-    var minBic = Math.min.apply(null, F4.comparacion.map(function (c) { return c.bic; }));
-    tablaEn($('tabla-ext'), ['Modelo', 'Escala σ', 'Asimetría α', 'm', 'ℓ', 'AIC', 'BIC', 'ν', 'Dif. BIC'], F4.comparacion.map(function (c) {
-      return [c.modelo + (c.modelo === 'M0' ? ' (seleccionado entre los 20)' : ''), { t: desc[c.modelo][0], izq: true }, { t: desc[c.modelo][1], izq: true }, String(c.m), num(c.loglik, 2), num(c.aic, 2), { t: num(c.bic, 2), fuerte: c.bic === minBic }, num(c.nu, 3), num(c.dbic, 2)];
-    }), function (k) { return F4.comparacion[k].bic === minBic ? 'elegido' : ''; }, 'compacta');
-  })();
-  function figEscalas() {
-    var nv = F4.nivel[xMod], m0 = F4.nivel.M0[0];
-    var filas = nv.map(function (r) { return { etiqueta: r.nivel, valores: [r.esc_izq * MILLON, r.esc_der * MILLON], r: r }; });
-    G.filas($('fig-escalas'), {
-      tipo: 'barra', anchoEtiqueta: 160, margenDer: 24, descripcion: 'Escala del error bajo y sobre la moda por nivel educacional',
-      series: [{ nombre: 'Bajo la moda', color: C2 }, { nombre: 'Sobre la moda', color: C1 }],
-      filas: filas, x: { min: 0, max: 1400000, fmt: corto, titulo: 'Escala del error' },
-      refX: [{ x: m0.esc_izq * MILLON }, { x: m0.esc_der * MILLON }],
-      lectura: function (f) { return { titulo: f.etiqueta, filas: [{ color: C2, valor: pesosMil(f.valores[0]), nombre: 'escala bajo la moda' }, { color: C1, valor: pesosMil(f.valores[1]), nombre: 'escala sobre la moda' }], nota: 'σ = ' + num(f.r.sigma, 3) + ' millones; α = ' + num(f.r.alpha, 3) + '. En M0: ' + pesosMil(m0.esc_izq * MILLON) + ' y ' + pesosMil(m0.esc_der * MILLON) }; },
-      tabla: { cols: ['Nivel educacional', 'σ (millones)', 'α', 'Escala bajo la moda', 'Escala sobre la moda'], filas: filas.map(function (f) { return [f.etiqueta, num(f.r.sigma, 4), num(f.r.alpha, 3), pesosMil(f.valores[0]), pesosMil(f.valores[1])]; }) }
-    });
-    tablaEn($('tabla-nivel'), ['Nivel educacional', 'Bajo la moda', 'Moda media', 'Mediana del error', 'Mediana observada'], nv.map(function (r, k) {
-      return [r.nivel, pct(100 * r.p_bajo), pesosMil(r.moda_media * MILLON), pesosMil(r.mediana_error * MILLON), pesosMil(F4.mediana_obs[k] * MILLON)];
-    }), null, 'compacta');
-  }
-  var figsExt = null;
-  function panelExtNivel() {
-    var cont = $('panel-ext-nivel');
-    if (!figsExt) figsExt = NIV.map(function (l) { return [figuraMini(cont, ''), figuraMini(cont, '')]; });
-    figsExt.forEach(function (par, k) {
-      par[0].querySelector('h4').textContent = NIV[k] + ' · M0';
-      par[1].querySelector('h4').textContent = NIV[k] + ' · ' + xMod;
-      panelNivel(par[0], 'M0', k, NB[xB], { color: TENUE, tituloX: k === 6 ? 'Residuo (millones de pesos)' : null });
-      panelNivel(par[1], xMod, k, NB[xB], { color: C1, tituloX: k === 6 ? 'Residuo (millones de pesos)' : null });
-    });
-    $('x-barras-out').textContent = NB[xB] + ' barras';
-  }
-  var figsTot = null, pesosNivel = F4.n_nivel.map(function (v) { return v / D.meta.n; });
-  function densidadMezcla(K) {
-    var p = F4.modelos[K];
-    if (!p.sigma_nivel && !p.alpha_nivel) { var s0 = Math.sqrt(p.sigma2[0]); return function (r) { return MOD.densidadError('T', r, s0, p.alpha[0], p.nu); }; }
-    var sg = p.sigma2.map(Math.sqrt);
-    return function (r) { var s = 0; for (var k = 0; k < 7; k++) s += pesosNivel[k] * MOD.densidadError('T', r, sg[k], p.alpha[k], p.nu); return s; };
-  }
-  function panelExtTotal() {
-    var cont = $('panel-ext-total'), lim = VENT[xtVent], k = KS[xtK], claves = ['M0', 'M1', 'M3'];
-    if (!figsTot) figsTot = claves.map(function () { return figuraMini(cont, ''); });
-    var prep = claves.map(function (K) {
-      var fn = densidadMezcla(K), barras = agrupar(F4.hist_total[K].c, k, D.meta.n, HF.base, HF.i0), cur = curva(fn, lim, 300);
-      return { K: K, fn: fn, barras: barras, cur: cur, max: maxVentana(barras, cur, lim) };
-    });
-    var ymax = Math.max.apply(null, prep.map(function (p) { return p.max; })) * 1.04;
-    prep.forEach(function (p, i) {
-      figsTot[i].querySelector('h4').textContent = NOMBRE_MOD[p.K];
-      panelResiduos(figsTot[i], p.barras, p.cur, lim, ymax, { fn: p.fn, color: p.K === 'M0' ? TENUE : C1, alto: 230, esquina: 'BIC ' + num(filaComp(p.K).bic, 0),
-        tituloX: 'Residuo (millones de pesos)', descripcion: 'Todos los residuos y densidad ajustada, modelo ' + p.K });
-    });
-    $('xt-ancho-out').textContent = anchoTexto(k);
-  }
-  var figsQQ = null;
-  function panelQQ() {
-    var cont = $('panel-qq'), teo = F4.qq_teorico;
-    if (!figsQQ) figsQQ = NIV.map(function (l) { return figuraMini(cont, l); });
-    figsQQ.forEach(function (fig, k) {
-      var a = F4.qq.M0[k].map(function (v, i) { return [teo[i], v]; }), b = F4.qq[xMod][k].map(function (v, i) { return [teo[i], v]; });
-      G.xy(fig, {
-        alto: 170, descripcion: 'Cuantiles de los residuos cuantílicos de ' + NIV[k], margen: { l: 30, r: 8, b: 24 },
-        x: { min: -2.6, max: 2.6, fmt: function (v) { return num(v, 0); }, marcas: [-2, 0, 2] },
-        y: { min: -2.8, max: 2.8, fmt: function (v) { return num(v, 0); }, marcas: [-2, 0, 2] },
-        capas: [{ tipo: 'linea', color: '#B3BBC4', puntos: [[-2.6, -2.6], [2.6, 2.6]], grosor: 1, trazo: '3 3' },
-          { tipo: 'linea', color: TENUE, nombre: 'M0', puntos: a }, { tipo: 'linea', color: C1, nombre: xMod, puntos: b }],
-        puntosX: teo,
-        lectura: function (xv, i) { return { titulo: 'Cuantil normal ' + num(xv, 2), filas: [{ color: TENUE, valor: num(a[i][1], 2), nombre: 'M0' }, { color: C1, valor: num(b[i][1], 2), nombre: xMod }] }; }
+  // ---- sueldos más declarados
+  (function () {
+    var cont = plot('f-frecuentes'), fr = D.frecuentes;
+    G.adaptable(cont, function () {
+      cont.innerHTML = '';
+      var fila = 26, L = G.lienzo(cont, { alto: fr.length * fila + 8, m: { t: 4, r: 56, b: 4, l: 82 } });
+      var x = G.escala(0, max(fr.map(function (f) { return f.pct; })), 0, L.w);
+      fr.forEach(function (f, i) {
+        var y0 = i * fila;
+        tx(L.g, -10, y0 + 15, F.pesos(f.monto), { 'text-anchor': 'end', 'class': 'etq' });
+        var r = el('rect', { x: 0, y: y0 + 4, width: x(f.pct), height: 15, rx: 2, fill: i === 0 ? C.naranja : C.obs }, L.g);
+        tx(L.g, x(f.pct) + 6, y0 + 16, F.pct(f.pct), { 'class': 'etq-2' });
+        G.conTip(r, function () { return G.filas([[F.pesos(f.monto)], ['Personas', F.num(f.n)], ['Porcentaje', F.pct(f.pct)], ['Acumulado', F.pct(f.acum)]]); });
       });
     });
-    var r0 = F4.residuos.M0, rx = F4.residuos[xMod];
-    tablaEn($('tabla-resq'), ['Nivel educacional', 'Media M0', 'DE M0', 'D M0', 'Media ' + xMod, 'DE ' + xMod, 'D ' + xMod], r0.map(function (r, k) {
-      return [r.nivel, num(r.media, 3), num(r.de, 3), num(r.dmax, 3), num(rx[k].media, 3), num(rx[k].de, 3), num(rx[k].dmax, 3)];
-    }), function (k) { return r0[k].nivel === 'Total' ? 'total' : ''; }, 'compacta');
-  }
-  (function tablaBeta() {
-    var c0 = F4.coef.M0, c1 = F4.coef.M1, c3 = F4.coef.M3;
-    tablaEn($('tabla-beta'), ['Coeficiente', 'M0', 'M1', 'M3'], c0.map(function (r, i) {
-      var f = function (v) { return (i === 7 || i === 8) ? pesos(v * MILLON) : pesosMil(v * MILLON); };
-      return [etq(r.parametro), f(r.est), f(c1[i].est), f(c3[i].est)];
-    }), null, 'compacta');
+    G.tabla(tablaFig('f-frecuentes'), ['Monto', 'Personas', 'Porcentaje', 'Porcentaje acumulado'], fr.map(function (f) { return [F.pesos(f.monto), F.num(f.n), F.pct(f.pct), F.pct(f.acum)]; }));
   })();
-  function dibujarExtension() { figEscalas(); panelExtNivel(); panelExtTotal(); panelQQ(); }
-  radio('x-mod', function (v) { xMod = v; dibujarExtension(); });
-  radio('xvent', function (v) { xtVent = v; panelExtTotal(); });
-  $('x-barras').addEventListener('input', function (ev) { xB = +ev.target.value; panelExtNivel(); });
-  $('xt-ancho').addEventListener('input', function (ev) { xtK = +ev.target.value; panelExtTotal(); });
-  registrar('extension', dibujarExtension);
 
-  vistas.metodologia = vistas.metodologia || [];
-  mostrar(location.hash.slice(1) || 'presentacion', true);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { dibujar(activa); });
+  // ---- perfiles por variable continua
+  (function () {
+    var cont = plot('f-perfiles'), vars = [['Escolaridad', 'Años de escolaridad', 'Escolaridad'], ['Edad', 'Edad (años)', 'Edad'], ['Horas', 'Horas semanales', 'Horas']];
+    var rho = {}; D.spearman.vars.forEach(function (v, j) { rho[v] = D.spearman.m[0][j]; });
+    var datos = vars.map(function (v) { return D.perfiles[v[0]].filter(function (p) { return p.n >= 50; }); });
+    var ym = max(datos.map(function (d) { return max(d.map(function (p) { return Math.max(p.media, p.mediana); })); }));
+    G.claves(ley('f-perfiles'), [{ tipo: 'linea', color: C.tinta, texto: 'Mediana' }, { tipo: 'discontinua', color: C.obs2, texto: 'Media' }]);
+    G.adaptable(cont, function () {
+      var ps = G.paneles(cont, 3);
+      vars.forEach(function (v, k) {
+        var d = datos[k], L = G.lienzo(ps[k], { alto: function (w) { return Math.max(210, Math.min(300, w * 0.82)); }, m: { t: 26, r: 8, b: 38, l: k === 0 ? 40 : 30 } });
+        var x = G.escala(min(d.map(function (p) { return p.x; })), max(d.map(function (p) { return p.x; })), 0, L.w), y = G.escala(0, Math.ceil(ym * 2) / 2, L.h, 0);
+        G.ejeY(L, y, { n: 5, formato: function (t) { return k === 0 ? F.num(t, t % 1 ? 1 : 0) : ''; } });
+        G.ejeX(L, x, { n: 5, titulo: v[1], dec: 0 });
+        tx(L.g, 0, -12, v[2], { 'class': 'titulo-panel' });
+        tx(L.g, L.w, -12, 'ρ = ' + F.num(rho[v[2]], 3), { 'class': 'sub-panel', 'text-anchor': 'end' });
+        G.linea(L, d.map(function (p) { return [p.x, p.media]; }), x, y, { stroke: C.obs2, 'stroke-dasharray': '5 3', 'stroke-width': 1.6 });
+        G.linea(L, d.map(function (p) { return [p.x, p.mediana]; }), x, y, { stroke: C.tinta, 'stroke-width': 2 });
+        var cruz = el('line', { y1: 0, y2: L.h, stroke: C.tinta3, 'stroke-width': 1, visibility: 'hidden' }, L.g);
+        var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
+        G.conTip(hov, function (ev) {
+          var p = L.svg.getBoundingClientRect(), xv = x.inv((ev.clientX - p.left) * L.ancho / p.width - L.m.l), best = d[0];
+          d.forEach(function (q) { if (Math.abs(q.x - xv) < Math.abs(best.x - xv)) best = q; });
+          cruz.setAttribute('x1', x(best.x)); cruz.setAttribute('x2', x(best.x)); cruz.setAttribute('visibility', 'visible');
+          return G.filas([[v[1] + ': ' + F.num(best.x)], ['Personas', F.num(best.n)], ['Mediana', F.pesosM(best.mediana)], ['Media', F.pesosM(best.media)]]);
+        });
+        hov.addEventListener('mouseleave', function () { cruz.setAttribute('visibility', 'hidden'); });
+      });
+    });
+    var filasT = []; vars.forEach(function (v, k) { datos[k].forEach(function (p) { filasT.push([v[2], F.num(p.x), F.num(p.n), F.pesosM(p.mediana), F.pesosM(p.media)]); }); });
+    G.tabla(tablaFig('f-perfiles'), ['Variable', 'Valor', 'Personas', 'Mediana', 'Media'], filasT);
+  })();
+
+  // ---- cajas por categoría
+  (function () {
+    var cont = plot('f-cajas'), cat = D.categorias;
+    var bloques = [['Nivel educacional', NIV], ['Tamaño de empresa', TAM], ['Sexo', ['Mujer', 'Hombre']]];
+    var xm = max(cat.map(function (c) { return c.p95; }));
+    G.adaptable(cont, function () {
+      cont.innerHTML = '';
+      var fila = 27, cab = 26, alto = 0; bloques.forEach(function (b) { alto += cab + b[1].length * fila + 10; });
+      var ancho = cont.clientWidth, ml = ancho < 560 ? 118 : 150;
+      var L = G.lienzo(cont, { alto: alto + 40, m: { t: 4, r: 16, b: 40, l: ml } });
+      var x = G.escala(0, Math.ceil(xm), 0, L.w), y0 = 0;
+      var ts = G.ticks(0, Math.ceil(xm), Math.max(3, Math.round(L.w / 80)));
+      var gr = el('g', { 'class': 'rejilla' }, L.g);
+      ts.forEach(function (t) { el('line', { x1: x(t), x2: x(t), y1: 0, y2: alto }, gr); });
+      bloques.forEach(function (b) {
+        tx(L.g, -ml, y0 + 16, b[0], { 'class': 'titulo-panel' });
+        y0 += cab;
+        b[1].forEach(function (k) {
+          var c = cat.filter(function (q) { return q.categoria === k; })[0], yc = y0 + fila / 2;
+          tx(L.g, -10, yc + 4, k, { 'text-anchor': 'end', 'class': 'etq-2' });
+          var g = el('g', null, L.g);
+          el('line', { x1: x(c.p5), x2: x(c.p95), y1: yc, y2: yc, stroke: C.obs2, 'stroke-width': 1.3 }, g);
+          el('rect', { x: x(c.p25), y: yc - 8, width: Math.max(1.5, x(c.p75) - x(c.p25)), height: 16, fill: C.obs, stroke: '#9aa4b0', 'stroke-width': 1, rx: 2 }, g);
+          el('line', { x1: x(c.mediana), x2: x(c.mediana), y1: yc - 8, y2: yc + 8, stroke: C.tinta, 'stroke-width': 2.2 }, g);
+          el('rect', { x: x(c.media) - 4, y: yc - 4, width: 8, height: 8, fill: C.tinta, transform: 'rotate(45 ' + x(c.media) + ' ' + yc + ')' }, g);
+          var hit = el('rect', { x: 0, y: y0, width: L.w, height: fila, 'class': 'zona-hover' }, g);
+          G.conTip(hit, function () {
+            return G.filas([[k + ' (' + F.num(c.n) + ' personas)'], ['Percentil 5', F.pesosM(c.p5)], ['Percentil 25', F.pesosM(c.p25)], ['Mediana', F.pesosM(c.mediana)],
+              ['Percentil 75', F.pesosM(c.p75)], ['Percentil 95', F.pesosM(c.p95)], ['Media', F.pesosM(c.media)], ['Moda', F.pesosM(c.moda)]]);
+          });
+          y0 += fila;
+        });
+        y0 += 10;
+      });
+      var ej = el('g', { 'class': 'eje', transform: 'translate(0,' + alto + ')' }, L.g);
+      el('line', { 'class': 'dominio', x1: 0, x2: L.w, y1: 0, y2: 0 }, ej);
+      ts.forEach(function (t) { tx(ej, x(t), 17, F.num(t, t % 1 ? 1 : 0), { 'text-anchor': 'middle' }); });
+      tx(ej, L.w / 2, 33, 'Millones de pesos', { 'text-anchor': 'middle', 'class': 'rot' });
+    });
+    G.tabla(tablaFig('f-cajas'), ['Categoría', 'Personas', '%', 'Media', 'Mediana', 'Moda', 'Rango intercuartílico', 'Percentil 90', '% bajo la moda', '% en la moda', '% sobre la moda'],
+      cat.map(function (c) { return [c.categoria, F.num(c.n), F.num(c.pct, 1), F.pesosM(c.media), F.pesosM(c.mediana), F.pesosM(c.moda), F.pesosM(c.ric), F.pesosM(c.p90), F.num(c.bajo, 1), F.num(c.en, 1), F.num(c.sobre, 1)]; }));
+  })();
+
+  // ---- tablas de asociación
+  (function () {
+    function pares(cont, M, cab) {
+      var f = []; M.vars.forEach(function (a, i) { M.vars.forEach(function (b, j) { if (j > i) f.push([a + ' y ' + b.toLowerCase(), F.num(M.m[i][j], 3)]); }); });
+      G.tabla(cont, ['Variables', cab], f); cont.classList.add('pares');
+    }
+    pares($('t-spearman'), D.spearman, 'ρ'); pares($('t-cramer'), D.cramer, 'V');
+    var nom = { esc: 'Escolaridad', edad: 'Edad', horas_trab: 'Horas', sexo_f: 'Sexo', tam_empresa: 'Tamaño de empresa', nivel_edu: 'Nivel educacional' };
+    var terms = []; D.gvif.forEach(function (g) { if (terms.indexOf(g.termino) < 0) terms.push(g.termino); });
+    G.tabla($('t-gvif'), ['Término', 'A', 'B'], terms.map(function (t) {
+      var a = D.gvif.filter(function (g) { return g.esp === 'A' && g.termino === t; })[0], b = D.gvif.filter(function (g) { return g.esp === 'B' && g.termino === t; })[0];
+      return [nom[t] || t, a ? F.num(a.aj, 3) : '', b ? F.num(b.aj, 3) : ''];
+    }));
+  })();
+
+  // ================================================================= 2. REGRESIÓN NORMAL
+  (function () {
+    var R = D.mco.res, cont = plot('f-mco'), nn = N;
+    G.claves(ley('f-mco'), [{ tipo: 'barra', color: C.obs, texto: 'Residuos estandarizados' }, { tipo: 'linea', color: C.mco, texto: 'Normal estándar' }]);
+    G.adaptable(cont, function () {
+      var ps = G.paneles(cont, 2);
+      // (a) histograma
+      var L = G.lienzo(ps[0], { alto: function (w) { return Math.max(230, Math.min(330, w * 0.72)); }, m: { t: 24, r: 8, b: 38, l: 40 } });
+      var bs = R.c.map(function (c, i) { return { a: R.bordes[i], b: R.bordes[i + 1], c: c, v: c / (nn * 0.2) }; });
+      var x = G.escala(-3, 8, 0, L.w), y = G.escala(0, Math.max(0.5, max(bs.map(function (b) { return b.v; })) * 1.05), L.h, 0);
+      G.ejeY(L, y, { n: 4 }); G.ejeX(L, x, { ticks: [-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8], dec: 0, titulo: 'Residuo estandarizado' });
+      tx(L.g, 0, -10, '(a) Histograma y densidad', { 'class': 'titulo-panel' });
+      barras(L, x, y, bs, C.obs);
+      var pts = []; for (var v = -3; v <= 8; v += 0.02) pts.push([v, M.normPdf(v)]);
+      G.linea(L, pts, x, y, { stroke: C.mco, 'stroke-width': 1.8 });
+      var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
+      G.conTip(hov, function (ev) {
+        var p = L.svg.getBoundingClientRect(), xv = x.inv((ev.clientX - p.left) * L.ancho / p.width - L.m.l), b = bs.filter(function (q) { return xv > q.a && xv <= q.b; })[0];
+        if (!b) return '';
+        return G.filas([['Entre ' + F.num(b.a, 1) + ' y ' + F.num(b.b, 1)], ['Residuos', F.num(b.c)], ['Porcentaje', F.pct(100 * b.c / nn, 2)], ['Normal estándar', F.pct(100 * (M.normCdf(b.b) - M.normCdf(b.a)), 2)]]);
+      });
+      // (b) Q-Q
+      var L2 = G.lienzo(ps[1], { alto: function (w) { return Math.max(230, Math.min(330, w * 0.72)); }, m: { t: 24, r: 8, b: 38, l: 40 } });
+      var qx = R.qq_i.map(function (i) { return M.normQ((i + 0.5) / nn); });
+      var x2 = G.escala(-4.5, 4.5, 0, L2.w), y2 = G.escala(-5, 35, L2.h, 0);
+      G.ejeY(L2, y2, { ticks: [-5, 0, 5, 10, 15, 20, 25, 30, 35], dec: 0 }); G.ejeX(L2, x2, { ticks: [-4, -2, 0, 2, 4], dec: 0, titulo: 'Cuantil de la normal estándar' });
+      tx(L2.g, 0, -10, '(b) Gráfico Q-Q normal', { 'class': 'titulo-panel' });
+      el('line', { x1: x2(-4.5), y1: y2(-4.5), x2: x2(4.5), y2: y2(4.5), stroke: C.obs2, 'stroke-dasharray': '4 3' }, L2.g);
+      var g = el('g', { fill: C.mco, 'fill-opacity': 0.55 }, L2.g);
+      R.qq_v.forEach(function (v, k) { el('circle', { cx: x2(qx[k]).toFixed(1), cy: y2(v).toFixed(1), r: 1.7 }, g); });
+    });
+    $('mco-nota').textContent = 'Quedan fuera del histograma ' + R.izq + ' residuos menores que −3 y ' + R.der + ' mayores que 8. El gráfico Q-Q muestra los 500 residuos menores, los 500 mayores y uno de cada 50 del resto.';
+    var aj = D.mco.ajuste;
+    G.tabla($('t-mco'), ['', 'Especificación A', 'Especificación B'], [
+      ['Parámetros (con σ)', aj[0].p + 1, aj[1].p + 1], ['<i>R</i><sup>2</sup> ajustado', F.num(aj[0].r2, 3), F.num(aj[1].r2, 3)],
+      ['Log-verosimilitud ℓ', F.num(aj[0].loglik, 2), F.num(aj[1].loglik, 2)], ['AIC', F.num(aj[0].aic, 2), F.num(aj[1].aic, 2)], ['BIC', F.num(aj[0].bic, 2), F.num(aj[1].bic, 2)],
+      ['σ̂ (millones de pesos)', F.num(aj[0].sigma, 4), F.num(aj[1].sigma, 4)], ['% de residuos sobre 3', F.num(aj[0].pct3, 2), F.num(aj[1].pct3, 2)]]);
+  })();
+
+  // ================================================================= 3. EXPLORADOR TP-SMN
+  (function () {
+    var cont = plot('f-explorador'), est = {}, st = { fam: 'T', alpha: -0.557, nu: 1.33, tau: 0.3 };
+    D.modelos.forEach(function (m) { if (m.esp === 'B' && m.tipo === 'TP') est[m.fam] = m; });
+    var rangos = { T: [0.5, 30, 0.01, 'Grados de libertad ν'], SL: [0.3, 10, 0.01, 'Parámetro de colas ν'], CN: [0.01, 0.99, 0.005, 'Proporción ν'] };
+    var aIn = $('ex-alpha'), nIn = $('ex-nu'), tIn = $('ex-tau');
+    function ajustarControles() {
+      var r = rangos[st.fam];
+      $('ex-nu-campo').hidden = !r; $('ex-tau-campo').hidden = st.fam !== 'CN';
+      if (r) { nIn.min = r[0]; nIn.max = r[1]; nIn.step = r[2]; $('ex-nu-rot').textContent = r[3]; st.nu = Math.min(r[1], Math.max(r[0], st.nu)); nIn.value = st.nu; }
+      tIn.value = st.tau; aIn.value = st.alpha;
+      $('ex-est').disabled = false;
+    }
+    function usarEstimacion() {
+      var m = est[st.fam]; st.alpha = m.alpha;
+      if (m.nu !== null) st.nu = m.nu;
+      if (m.tau !== null) st.tau = m.tau;
+      ajustarControles(); dibujar();
+    }
+    segmento($('ex-fam'), 'exfam', ORDEN_FAM.map(function (f) { return { v: f, t: f === 'T' ? '<i>t</i>' : FAM[f] }; }), st.fam, function (v) {
+      st.fam = v; var m = est[v]; st.alpha = m.alpha; if (m.nu !== null) st.nu = m.nu; if (m.tau !== null) st.tau = m.tau; ajustarControles(); dibujar();
+    });
+    aIn.addEventListener('input', function () { st.alpha = +aIn.value; dibujar(); });
+    nIn.addEventListener('input', function () { st.nu = +nIn.value; dibujar(); });
+    tIn.addEventListener('input', function () { st.tau = +tIn.value; dibujar(); });
+    $('ex-est').addEventListener('click', usarEstimacion);
+    function par() { return { nu: st.nu, tau: st.tau }; }
+    function dibujar() {
+      $('ex-alpha-o').textContent = F.num(st.alpha, 3); $('ex-nu-o').textContent = F.num(st.nu, st.fam === 'CN' ? 3 : 2); $('ex-tau-o').textContent = F.num(st.tau, 3);
+      cont.innerHTML = '';
+      var T = M.tp(st.fam, 1, st.alpha, par()), S = M.tp(st.fam, 1, 0, par());
+      var L = G.lienzo(cont, { alto: function (w) { return Math.max(240, Math.min(330, w * 0.56)); }, m: { t: 24, r: 10, b: 38, l: 40 } });
+      var xa = -6, xb = 10, x = G.escala(xa, xb, 0, L.w), pts = [], ptsS = [], ym = 0;
+      for (var i = 0; i <= 400; i++) { var v = xa + (xb - xa) * i / 400, d = T.dens(v), ds = S.dens(v); pts.push([v, d]); ptsS.push([v, ds]); ym = Math.max(ym, d, ds); }
+      var y = G.escala(0, ym * 1.1, L.h, 0);
+      G.ejeY(L, y, { n: 4 }); G.ejeX(L, x, { ticks: [-6, -4, -2, 0, 2, 4, 6, 8, 10], dec: 0, titulo: 'Error estándar (σ = 1)' });
+      var izq = pts.filter(function (p) { return p[0] <= 0; }), der = pts.filter(function (p) { return p[0] >= 0; });
+      G.area(L, izq.concat([[0, T.dens(0)]]), x, y, 0, { fill: C.mco, 'fill-opacity': 0.14 });
+      G.area(L, [[0, T.dens(0)]].concat(der), x, y, 0, { fill: C.naranja, 'fill-opacity': 0.2 });
+      G.linea(L, ptsS, x, y, { stroke: C.obs2, 'stroke-width': 1.6, 'stroke-dasharray': '5 4' });
+      G.linea(L, pts, x, y, { stroke: C.tinta, 'stroke-width': 2.2 });
+      el('line', { x1: x(0), x2: x(0), y1: y(T.dens(0)), y2: L.h, stroke: C.tinta, 'stroke-width': 1 }, L.g);
+      var pb = (1 + st.alpha) / 2;
+      tx(L.g, x(0) - 8, 4, F.pct(100 * pb) + ' bajo la moda', { 'text-anchor': 'end', 'class': 'etq', 'font-weight': 600 });
+      tx(L.g, x(0) + 8, 4, F.pct(100 * (1 - pb)) + ' sobre la moda', { 'class': 'etq', 'font-weight': 600 });
+      var med = T.cuantil(0.5), media = T.media(), varf = M.varFinita(st.fam, par());
+      var l = [['Proporción bajo la moda', F.pct(100 * pb)], ['Escala bajo / sobre la moda', F.num(1 + st.alpha, 3) + ' / ' + F.num(1 - st.alpha, 3)],
+        ['Mediana del error', F.num(med, 3)], ['Media del error', isFinite(media) ? F.num(media, 3) + '<small>' + (varf ? 'varianza finita' : 'varianza infinita') + '</small>' : 'No existe<small>ni la varianza</small>']];
+      $('ex-lecturas').innerHTML = l.map(function (q) { return '<div class="lectura">' + q[0] + '<b>' + q[1] + '</b></div>'; }).join('');
+      var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
+      G.conTip(hov, function (ev) {
+        var p = L.svg.getBoundingClientRect(), xv = x.inv((ev.clientX - p.left) * L.ancho / p.width - L.m.l);
+        return G.filas([['Error = ' + F.num(xv, 2)], ['Densidad de dos piezas', F.num(T.dens(xv), 4)], ['Densidad simétrica', F.num(S.dens(xv), 4)], ['P(error ≤ valor)', F.pct(100 * T.cdf(xv))]]);
+      });
+    }
+    ajustarControles();
+    G.adaptable(cont, dibujar);
+  })();
+
+  // ================================================================= 4. VEINTE MODELOS
+  var MB = D.modelos.filter(function (m) { return m.esp === 'B'; });
+  function modeloTP(m) { return M.tp(m.fam, Math.sqrt(m.sigma2), m.alpha || 0, { nu: m.nu, tau: m.tau }); }
+  function ordenB() { var o = []; ['SMN', 'TP'].forEach(function (t) { ORDEN_FAM.forEach(function (f) { o.push(MB.filter(function (m) { return m.tipo === t && m.fam === f; })[0]); }); }); return o; }
+
+  // ---- BIC
+  (function () {
+    var cont = plot('f-bic');
+    G.claves(ley('f-bic'), [{ tipo: 'hueco', color: C.mco, texto: 'Simétrica (SMN)' }, { tipo: 'punto', color: C.mco, texto: 'Dos piezas (TP-SMN)' }, { tipo: 'punto', color: C.comun, texto: 'Menor BIC: TP-<i>t</i>, especificación B' }]);
+    function bic(esp, tipo, fam) { return D.modelos.filter(function (m) { return m.esp === esp && m.tipo === tipo && m.fam === fam; })[0]; }
+    G.adaptable(cont, function () {
+      var ps = G.paneles(cont, 2); cont.className = 'fig-plot rejilla-2';
+      ['A', 'B'].forEach(function (esp, k) {
+        var fila = 34, L = G.lienzo(ps[k], { alto: 5 * fila + 66, m: { t: 26, r: 14, b: 40, l: k === 0 || ps[0].offsetTop !== ps[1].offsetTop ? 128 : 128 } });
+        var x = G.escala(20000, 100000, 0, L.w);
+        G.ejeX(L, x, { ticks: [20000, 40000, 60000, 80000, 100000], formato: function (v) { return F.num(v / 1000) + ' mil'; }, rejilla: true, titulo: 'BIC' });
+        tx(L.g, -L.m.l, -10, esp === 'A' ? 'Especificación A: años de escolaridad' : 'Especificación B: nivel educacional', { 'class': 'titulo-panel' });
+        ORDEN_FAM.forEach(function (f, i) {
+          var yc = i * fila + fila / 2, s = bic(esp, 'SMN', f), t = bic(esp, 'TP', f);
+          tx(L.g, -10, yc + 4, f === 'T' ? 't' : FAM[f], { 'text-anchor': 'end', 'class': 'etq-2', 'font-style': f === 'T' ? 'italic' : null });
+          el('line', { x1: x(s.bic), x2: x(t.bic), y1: yc, y2: yc, stroke: '#aab2bc', 'stroke-width': 1.5 }, L.g);
+          var col = t.sel ? C.comun : C.mco;
+          var c1 = el('circle', { cx: x(s.bic), cy: yc, r: 5.5, fill: '#fff', stroke: C.mco, 'stroke-width': 1.8 }, L.g);
+          var c2 = el('circle', { cx: x(t.bic), cy: yc, r: 6, fill: col, stroke: '#fff', 'stroke-width': 1.5 }, L.g);
+          [[c1, s], [c2, t]].forEach(function (q) {
+            G.conTip(q[0], function () { return G.filas([[nombreTxt(q[1]) + ', especificación ' + esp], ['Parámetros', q[1].m], ['Log-verosimilitud', F.num(q[1].loglik, 2)], ['BIC', F.num(q[1].bic, 2)]]); });
+          });
+          if (t.sel) tx(L.g, x(t.bic), yc - 11, 'Menor BIC', { 'class': 'etq', 'text-anchor': 'middle', fill: C.comun, style: 'fill:' + C.comun, 'font-weight': 600 });
+        });
+      });
+    });
+    var filasT = ORDEN_FAM.map(function (f) { return [FAM[f]].concat(['A', 'B'].reduce(function (a, e) { return a.concat([F.num(bic(e, 'SMN', f).bic, 2), F.num(bic(e, 'TP', f).bic, 2)]); }, [])); });
+    G.tabla(tablaFig('f-bic'), ['Distribución', 'A simétrica', 'A dos piezas', 'B simétrica', 'B dos piezas'], filasT);
+  })();
+
+  // ---- tabla de ajuste
+  (function () {
+    var esp = 'B';
+    function dibujar() {
+      var ms = D.modelos.filter(function (m) { return m.esp === esp; });
+      ms.sort(function (a, b) { return a.bic - b.bic; });
+      G.tabla($('t-modelos'), ['Modelo', 'm', 'ℓ', 'AIC', 'BIC', 'σ̂²', 'α̂', 'ν̂', 'τ̂', 'Iteraciones'], ms.map(function (m) {
+        return [nombreModelo(m), m.m, F.num(m.loglik, 2), F.num(m.aic, 2), F.num(m.bic, 2), F.num(m.sigma2, 5), m.tipo === 'TP' ? F.num(m.alpha, 3) : '0', m.nu === null ? '' : F.num(m.nu, 3), m.tau === null ? '' : F.num(m.tau, 3), m.iter];
+      }), { clase: function (k) { return ms[k].sel ? 'destacada' : ''; } });
+    }
+    segmento($('tm-esp'), 'tmesp', [{ v: 'A', t: 'Especificación A' }, { v: 'B', t: 'Especificación B' }], esp, function (v) { esp = v; dibujar(); });
+    dibujar();
+  })();
+
+  // ---- residuos y densidad (10 paneles)
+  (function () {
+    var cont = plot('f-ajuste'), ancho = 0.05, ms = ordenB();
+    var pv = ms.map(function (m) { return m.pct_ventana; });
+    $('aj-pct').textContent = 'entre el ' + F.pct(min(pv)) + ' y el ' + F.pct(max(pv));
+    G.claves(ley('f-ajuste'), [{ tipo: 'barra', color: C.obs, texto: 'Residuos' }, { tipo: 'linea', color: C.mco, texto: 'Densidad ajustada del error' }, { tipo: 'linea', color: C.comun, texto: 'TP-<i>t</i>: menor BIC' }]);
+    segmento($('aj-ancho'), 'ajancho', [{ v: 0.02, t: '$20.000' }, { v: 0.05, t: '$50.000' }, { v: 0.1, t: '$100.000' }], ancho, function (v) { ancho = v; dibujar(); });
+    function dibujar() {
+      var ps = G.paneles(cont, 10), datos = ms.map(function (m) {
+        var bs = reagrupar(m.res, ancho, -1, 2).map(function (b) { b.v = b.c / (N * ancho); return b; });
+        var T = modeloTP(m), pts = []; for (var i = 0; i <= 300; i++) { var v = -1 + 3 * i / 300; pts.push([v, T.dens(v)]); }
+        return { m: m, bs: bs, pts: pts, T: T };
+      });
+      var ym = max(datos.map(function (d) { return Math.max(max(d.bs.map(function (b) { return b.v; })), max(d.pts.map(function (p) { return p[1]; }))); }));
+      datos.forEach(function (d, k) {
+        var izq = k % 5 === 0, L = G.lienzo(ps[k], { alto: function (w) { return Math.max(150, Math.min(220, w * 0.95)); }, m: { t: 22, r: 4, b: 30, l: izq ? 30 : 10 } });
+        var x = G.escala(-1, 2, 0, L.w), y = G.escala(0, ym * 1.04, L.h, 0);
+        G.ejeY(L, y, { ticks: [0, 1, 2, 3, 4].filter(function (t) { return t <= ym * 1.04; }), formato: function (t) { return izq ? F.num(t) : ''; } });
+        G.ejeX(L, x, { ticks: [-1, 0, 1, 2], dec: 0 });
+        var col = d.m.sel ? C.comun : C.mco;
+        tx(L.g, 0, -8, '', { 'class': 'titulo-panel' }).innerHTML = (d.m.tipo === 'TP' ? 'TP-' : '') + (d.m.fam === 'T' ? '<tspan font-style="italic">t</tspan>' : FAM[d.m.fam]);
+        barras(L, x, y, d.bs, C.obs);
+        el('line', { x1: x(0), x2: x(0), y1: 0, y2: L.h, stroke: C.tinta3, 'stroke-dasharray': '3 3', 'stroke-width': 1 }, L.g);
+        G.linea(L, d.pts, x, y, { stroke: col, 'stroke-width': d.m.sel ? 2.4 : 1.7 });
+        var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
+        G.conTip(hov, function (ev) {
+          var p = L.svg.getBoundingClientRect(), xv = x.inv((ev.clientX - p.left) * L.ancho / p.width - L.m.l), b = d.bs.filter(function (q) { return xv > q.a && xv <= q.b; })[0];
+          if (!b) return '';
+          return G.filas([[nombreTxt(d.m)], ['Residuo entre', F.pesos(b.a * 1e6) + ' y ' + F.pesos(b.b * 1e6)], ['Observado', F.pct(100 * b.c / N)], ['Según el modelo', F.pct(100 * (d.T.cdf(b.b) - d.T.cdf(b.a)))]]);
+        });
+      });
+    }
+    G.adaptable(cont, dibujar);
+  })();
+
+  // ---- Q-Q de residuos cuantílicos (10 paneles)
+  (function () {
+    var cont = plot('f-qq'), ms = ordenB(), xt = D.qq_teorico;
+    var ya = min(ms.map(function (m) { return min(m.qq); })), yb = max(ms.map(function (m) { return max(m.qq); }));
+    G.adaptable(cont, function () {
+      var ps = G.paneles(cont, 10);
+      ms.forEach(function (m, k) {
+        var izq = k % 5 === 0, L = G.lienzo(ps[k], { alto: function (w) { return Math.max(150, Math.min(220, w * 0.95)); }, m: { t: 22, r: 4, b: 30, l: izq ? 30 : 10 } });
+        var x = G.escala(-3.3, 3.3, 0, L.w), y = G.escala(Math.floor(ya), Math.ceil(yb), L.h, 0);
+        G.ejeY(L, y, { ticks: G.ticks(Math.floor(ya), Math.ceil(yb), 4), formato: function (t) { return izq ? F.num(t) : ''; } });
+        G.ejeX(L, x, { ticks: [-3, 0, 3], dec: 0 });
+        tx(L.g, 0, -8, '', { 'class': 'titulo-panel' }).innerHTML = (m.tipo === 'TP' ? 'TP-' : '') + (m.fam === 'T' ? '<tspan font-style="italic">t</tspan>' : FAM[m.fam]);
+        el('line', { x1: x(-3.3), y1: y(-3.3), x2: x(3.3), y2: y(3.3), stroke: C.obs2, 'stroke-dasharray': '3 3' }, L.g);
+        G.linea(L, m.qq.map(function (v, i) { return [xt[i], v]; }), x, y, { stroke: m.sel ? C.comun : C.mco, 'stroke-width': m.sel ? 2.4 : 1.7 });
+        tx(L.g, L.w - 2, L.h - 8, 'D = ' + F.num(m.diag.D, 3), { 'text-anchor': 'end', 'class': 'sub-panel', 'font-weight': m.sel ? 600 : 400 });
+        var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
+        G.conTip(hov, function (ev) {
+          var p = L.svg.getBoundingClientRect(), xv = x.inv((ev.clientX - p.left) * L.ancho / p.width - L.m.l), i = 0;
+          xt.forEach(function (v, j) { if (Math.abs(v - xv) < Math.abs(xt[i] - xv)) i = j; });
+          return G.filas([[nombreTxt(m)], ['Orden', F.num(D.qq_orden[i], D.qq_orden[i] < 0.01 || D.qq_orden[i] > 0.99 ? 4 : 2)], ['Normal estándar', F.num(xt[i], 3)], ['Residuo cuantílico', F.num(m.qq[i], 3)]]);
+        });
+      });
+    });
+    G.tabla($('t-residuos'), ['Modelo', 'Media', 'Desv. estándar', 'Asimetría', 'Curtosis', '% |q| > 2', '% |q| > 3', '<i>D</i>'], ms.map(function (m) {
+      var g = m.diag; return [nombreModelo(m), F.num(g.media, 3), F.num(g.de, 3), F.num(g.asim, 3), F.num(g.curt, 3), F.num(g.p2, 2), F.num(g.p3, 2), F.num(g.D, 3)];
+    }), { clase: function (k) { return ms[k].sel ? 'destacada' : ''; } });
+  })();
+
+  // ================================================================= 5. ESCALA POR NIVEL
+  var E = D.escala, NJ = E.n_nivel;
+  function errorNivel(mod, j) { var e = E[mod]; return M.tp('T', Math.sqrt(e.s2[j]), e.alpha, { nu: e.nu }); }
+  var NIVT = NIV.concat(['Total']);
+
+  // ---- residuos cuantílicos por nivel (media ± DE)
+  (function () {
+    var cont = plot('f-resnivel'), R = E.residuos_nivel;
+    G.claves(ley('f-resnivel'), [{ tipo: 'punto', color: C.comun, texto: 'Escala común' }, { tipo: 'punto', color: C.nivel, texto: 'Escala por nivel' }]);
+    G.adaptable(cont, function () {
+      cont.innerHTML = '';
+      var fila = 34, ml = cont.clientWidth < 460 ? 118 : 138, L = G.lienzo(cont, { alto: NIVT.length * fila + 44, m: { t: 6, r: 12, b: 38, l: ml } });
+      var x = G.escala(-1.25, 2.4, 0, L.w);
+      G.ejeX(L, x, { ticks: [-1, 0, 1, 2], dec: 0, rejilla: true, titulo: 'Residuo cuantílico' });
+      [-1, 1].forEach(function (v) { el('line', { x1: x(v), x2: x(v), y1: 0, y2: L.h, stroke: C.obs2, 'stroke-dasharray': '3 3' }, L.g); });
+      el('line', { x1: x(0), x2: x(0), y1: 0, y2: L.h, stroke: C.tinta3, 'stroke-width': 1 }, L.g);
+      NIVT.forEach(function (nv, i) {
+        var yc = i * fila + fila / 2;
+        tx(L.g, -10, yc + 4, nv === 'Total' ? 'Todos los niveles' : nv, { 'text-anchor': 'end', 'class': 'etq-2', 'font-weight': nv === 'Total' ? 600 : null });
+        ['comun', 'nivel'].forEach(function (mod, k) {
+          var r = R[mod][i], yy = yc + (k === 0 ? -6 : 6), col = C[mod];
+          el('line', { x1: x(r.media - r.de), x2: x(r.media + r.de), y1: yy, y2: yy, stroke: col, 'stroke-width': 2 }, L.g);
+          var c = el('circle', { cx: x(r.media), cy: yy, r: 4.5, fill: col, stroke: '#fff', 'stroke-width': 1.2 }, L.g);
+          G.conTip(c, function () { return G.filas([[nv === 'Total' ? 'Todos los niveles' : nv], [MOD[mod]], ['Media', F.num(r.media, 3)], ['Desviación estándar', F.num(r.de, 3)], ['% con |q| > 2', F.num(r.p2, 2)], ['<i>D</i>', F.num(r.D, 3)]]); });
+        });
+      });
+    });
+    G.tabla(tablaFig('f-resnivel'), ['Nivel', 'Común: media', 'Común: DE', 'Común: <i>D</i>', 'Por nivel: media', 'Por nivel: DE', 'Por nivel: <i>D</i>'], NIVT.map(function (nv, i) {
+      var a = R.comun[i], b = R.nivel[i]; return [nv === 'Total' ? 'Todos los niveles' : nv, F.num(a.media, 3), F.num(a.de, 3), F.num(a.D, 3), F.num(b.media, 3), F.num(b.de, 3), F.num(b.D, 3)];
+    }));
+  })();
+
+  // ---- pesos por nivel (cajas)
+  (function () {
+    var cont = plot('f-pesos'), P = E.pesos_nivel;
+    G.claves(ley('f-pesos'), [{ tipo: 'barra', color: C.comunClaro, texto: 'Escala común' }, { tipo: 'barra', color: C.nivelClaro, texto: 'Escala por nivel' }]);
+    G.adaptable(cont, function () {
+      cont.innerHTML = '';
+      var fila = 34, ml = cont.clientWidth < 460 ? 118 : 138, L = G.lienzo(cont, { alto: NIVT.length * fila + 44, m: { t: 6, r: 12, b: 38, l: ml } });
+      var x = G.escala(0, 1.8, 0, L.w);
+      G.ejeX(L, x, { ticks: [0, 0.5, 1, 1.5], dec: 1, rejilla: true, titulo: 'Peso û' });
+      el('line', { x1: x(0.5), x2: x(0.5), y1: 0, y2: L.h, stroke: C.tinta3, 'stroke-dasharray': '2 3' }, L.g);
+      NIVT.forEach(function (nv, i) {
+        var yc = i * fila + fila / 2;
+        tx(L.g, -10, yc + 4, nv === 'Total' ? 'Todos los niveles' : nv, { 'text-anchor': 'end', 'class': 'etq-2', 'font-weight': nv === 'Total' ? 600 : null });
+        ['comun', 'nivel'].forEach(function (mod, k) {
+          var r = P[mod][i], yy = yc + (k === 0 ? -6.5 : 6.5), col = C[mod], claro = mod === 'comun' ? C.comunClaro : C.nivelClaro, g = el('g', null, L.g);
+          el('line', { x1: x(r.p5), x2: x(r.p95), y1: yy, y2: yy, stroke: col, 'stroke-width': 1.2 }, g);
+          el('rect', { x: x(r.p25), y: yy - 5, width: Math.max(1, x(r.p75) - x(r.p25)), height: 10, fill: claro, stroke: col, 'stroke-width': 1 }, g);
+          el('line', { x1: x(r.p50), x2: x(r.p50), y1: yy - 5, y2: yy + 5, stroke: col, 'stroke-width': 2.2 }, g);
+          var hit = el('rect', { x: 0, y: yy - 6.5, width: L.w, height: 13, 'class': 'zona-hover' }, g);
+          G.conTip(hit, function () { return G.filas([[(nv === 'Total' ? 'Todos los niveles' : nv) + ', ' + MOD[mod].toLowerCase()], ['Percentil 5', F.num(r.p5, 3)], ['Percentil 25', F.num(r.p25, 3)], ['Mediana', F.num(r.p50, 3)], ['Percentil 75', F.num(r.p75, 3)], ['Percentil 95', F.num(r.p95, 3)], ['% con peso < 1/2', F.num(r.bajo, 1)]]); });
+        });
+      });
+    });
+    var filasT = []; NIVT.forEach(function (nv, i) { ['comun', 'nivel'].forEach(function (mod) { var r = P[mod][i]; filasT.push([nv === 'Total' ? 'Todos los niveles' : nv, MOD[mod], F.num(r.p5, 3), F.num(r.p25, 3), F.num(r.p50, 3), F.num(r.p75, 3), F.num(r.p95, 3), F.num(r.medio, 3), F.num(r.bajo, 1)]); }); });
+    G.tabla(tablaFig('f-pesos'), ['Nivel', 'Modelo', 'P5', 'P25', 'Mediana', 'P75', 'P95', 'Media', '% < 1/2'], filasT, { txt: [1] });
+  })();
+
+  // ---- tabla de comparación
+  (function () {
+    var c = E.comparacion;
+    G.tabla($('t-escala'), ['', 'Escala común', 'Escala por nivel'], [
+      ['Parámetros m', c[0].m, c[1].m], ['Log-verosimilitud ℓ', F.num(c[0].loglik, 2), F.num(c[1].loglik, 2)], ['AIC', F.num(c[0].aic, 2), F.num(c[1].aic, 2)],
+      ['BIC', F.num(c[0].bic, 2), F.num(c[1].bic, 2)], ['Diferencia de BIC', '', F.num(c[1].dbic, 2)], ['α̂', F.num(c[0].alpha, 3), F.num(c[1].alpha, 3)],
+      ['ν̂', F.num(c[0].nu, 3), F.num(c[1].nu, 3)], ['Iteraciones', c[0].iter, c[1].iter]]);
+  })();
+
+  // ---- residuos totales y densidad (2 paneles)
+  (function () {
+    var cont = plot('f-total');
+    G.claves(ley('f-total'), [{ tipo: 'barra', color: C.obs, texto: 'Residuos' }, { tipo: 'linea', color: C.comun, texto: 'Escala común' }, { tipo: 'linea', color: C.nivel, texto: 'Escala por nivel (mezcla)' }]);
+    var lo = E.comun.hist_total.k0 / 100, hi = (E.comun.hist_total.k0 + E.comun.hist_total.c.length) / 100;
+    function cdfMod(mod, v) { var s = 0; for (var j = 0; j < 7; j++) s += NJ[j] / N * errorNivel(mod, j).cdf(v); return s; }
+    function densMod(mod, v) { var s = 0; for (var j = 0; j < 7; j++) s += NJ[j] / N * errorNivel(mod, j).dens(v); return s; }
+    G.adaptable(cont, function () {
+      var ps = G.paneles(cont, 2), datos = ['comun', 'nivel'].map(function (mod) {
+        var bs = reagrupar(E[mod].hist_total, 0.05, lo, hi).map(function (b) { b.v = b.c / (N * 0.05); return b; }), pts = [];
+        for (var i = 0; i <= 400; i++) { var v = lo + (hi - lo) * i / 400; pts.push([v, densMod(mod, v)]); }
+        pts.push([0, densMod(mod, 0)]); pts.sort(function (a, b) { return a[0] - b[0]; });
+        return { mod: mod, bs: bs, pts: pts };
+      });
+      var ym = max(datos.map(function (d) { return Math.max(max(d.bs.map(function (b) { return b.v; })), max(d.pts.map(function (p) { return p[1]; }))); }));
+      datos.forEach(function (d, k) {
+        var L = G.lienzo(ps[k], { alto: function (w) { return Math.max(200, Math.min(280, w * 0.7)); }, m: { t: 22, r: 6, b: 38, l: 32 } });
+        var x = G.escala(lo, hi, 0, L.w), y = G.escala(0, ym * 1.05, L.h, 0);
+        G.ejeY(L, y, { n: 4 }); G.ejeX(L, x, { n: 5, titulo: 'Residuo (millones de pesos)' });
+        tx(L.g, 0, -8, MOD[d.mod], { 'class': 'titulo-panel' });
+        barras(L, x, y, d.bs, C.obs);
+        el('line', { x1: x(0), x2: x(0), y1: 0, y2: L.h, stroke: C.tinta3, 'stroke-dasharray': '3 3' }, L.g);
+        G.linea(L, d.pts, x, y, { stroke: C[d.mod], 'stroke-width': 2.2 });
+        var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
+        G.conTip(hov, function (ev) {
+          var p = L.svg.getBoundingClientRect(), xv = x.inv((ev.clientX - p.left) * L.ancho / p.width - L.m.l), b = d.bs.filter(function (q) { return xv > q.a && xv <= q.b; })[0];
+          if (!b) return '';
+          return G.filas([[MOD[d.mod]], ['Residuo entre', F.pesos(b.a * 1e6) + ' y ' + F.pesos(b.b * 1e6)], ['Observado', F.pct(100 * b.c / N)], ['Según el modelo', F.pct(100 * (cdfMod(d.mod, b.b) - cdfMod(d.mod, b.a)))]]);
+        });
+      });
+    });
+  })();
+
+  // ---- Q-Q por nivel (8 paneles)
+  (function () {
+    var cont = plot('f-qqnivel'), xt = D.qq_nivel_teorico, R = E.residuos_nivel;
+    G.claves(ley('f-qqnivel'), [{ tipo: 'discontinua', color: C.comun, texto: 'Escala común' }, { tipo: 'linea', color: C.nivel, texto: 'Escala por nivel' }, { tipo: 'punteada', color: C.obs2, texto: 'Diagonal' }]);
+    var todos = E.comun.qq.concat(E.nivel.qq), ya = Math.floor(min(todos.map(min))), yb = Math.ceil(max(todos.map(max)));
+    G.adaptable(cont, function () {
+      var ps = G.paneles(cont, 8), cols = getComputedStyle(cont).gridTemplateColumns.split(' ').length;
+      NIVT.forEach(function (nv, j) {
+        var izq = j % cols === 0, L = G.lienzo(ps[j], { alto: function (w) { return Math.max(170, Math.min(250, w * 0.92)); }, m: { t: 22, r: 6, b: 30, l: izq ? 28 : 10 } });
+        var x = G.escala(-2.8, 2.8, 0, L.w), y = G.escala(ya, yb, L.h, 0);
+        G.ejeY(L, y, { ticks: G.ticks(ya, yb, 4), formato: function (t) { return izq ? F.num(t) : ''; } });
+        G.ejeX(L, x, { ticks: [-2, 0, 2], dec: 0 });
+        tx(L.g, 0, -8, nv === 'Total' ? 'Todos los niveles' : nv, { 'class': 'titulo-panel' });
+        el('line', { x1: x(-2.8), y1: y(-2.8), x2: x(2.8), y2: y(2.8), stroke: C.obs2, 'stroke-dasharray': '2 3' }, L.g);
+        G.linea(L, E.comun.qq[j].map(function (v, i) { return [xt[i], v]; }), x, y, { stroke: C.comun, 'stroke-width': 1.8, 'stroke-dasharray': '5 3' });
+        G.linea(L, E.nivel.qq[j].map(function (v, i) { return [xt[i], v]; }), x, y, { stroke: C.nivel, 'stroke-width': 2.2 });
+        tx(L.g, L.w - 2, L.h - 22, 'D = ' + F.num(R.comun[j].D, 3), { 'text-anchor': 'end', 'class': 'sub-panel', fill: C.comun, style: 'fill:' + C.comun });
+        tx(L.g, L.w - 2, L.h - 8, 'D = ' + F.num(R.nivel[j].D, 3), { 'text-anchor': 'end', 'class': 'sub-panel', fill: C.nivel, style: 'fill:#a85400' });
+        var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
+        G.conTip(hov, function (ev) {
+          var p = L.svg.getBoundingClientRect(), xv = x.inv((ev.clientX - p.left) * L.ancho / p.width - L.m.l), i = 0;
+          xt.forEach(function (v, k) { if (Math.abs(v - xv) < Math.abs(xt[i] - xv)) i = k; });
+          return G.filas([[nv === 'Total' ? 'Todos los niveles' : nv], ['Orden', F.num(D.qq_nivel_orden[i], 3)], ['Normal estándar', F.num(xt[i], 3)], ['Escala común', F.num(E.comun.qq[j][i], 3)], ['Escala por nivel', F.num(E.nivel.qq[j][i], 3)]]);
+        });
+      });
+    });
+    G.tabla(tablaFig('f-qqnivel'), ['Nivel', 'Común: media', 'Común: DE', 'Común: % |q| > 2', 'Común: <i>D</i>', 'Por nivel: media', 'Por nivel: DE', 'Por nivel: % |q| > 2', 'Por nivel: <i>D</i>'], NIVT.map(function (nv, i) {
+      var a = R.comun[i], b = R.nivel[i];
+      return [nv === 'Total' ? 'Todos los niveles' : nv, F.num(a.media, 3), F.num(a.de, 3), F.num(a.p2, 2), F.num(a.D, 3), F.num(b.media, 3), F.num(b.de, 3), F.num(b.p2, 2), F.num(b.D, 3)];
+    }));
+  })();
+
+  // ---- histogramas por nivel con densidad
+  (function () {
+    var cont = plot('f-histnivel'), mod = 'nivel';
+    segmento($('hn-mod'), 'hnmod', [{ v: 'nivel', t: 'Escala por nivel' }, { v: 'comun', t: 'Escala común' }], mod, function (v) { mod = v; dibujar(); });
+    function dibujar() {
+      var ps = G.paneles(cont, 7);
+      NIV.forEach(function (nv, j) {
+        var h = E[mod].hist_nivel[j], lo = h.k0 / 100, hi = (h.k0 + h.c.length) / 100, rango = hi - lo;
+        var ancho = [0.01, 0.02, 0.05, 0.1, 0.2].filter(function (w) { return rango / w <= 75; })[0] || 0.2;
+        var bs = reagrupar(h, ancho, lo, hi).map(function (b) { b.v = b.c / (NJ[j] * ancho); return b; });
+        var T = errorNivel(mod, j), pts = []; for (var i = 0; i <= 240; i++) { var v = lo + rango * i / 240; pts.push([v, T.dens(v)]); }
+        pts.push([0, T.dens(0)]); pts.sort(function (a, b) { return a[0] - b[0]; });
+        var ym = Math.max(max(bs.map(function (b) { return b.v; })), T.dens(0));
+        var L = G.lienzo(ps[j], { alto: function (w) { return Math.max(160, Math.min(230, w * 0.82)); }, m: { t: 34, r: 6, b: 30, l: 30 } });
+        var x = G.escala(lo, hi, 0, L.w), y = G.escala(0, ym * 1.05, L.h, 0);
+        G.ejeY(L, y, { n: 3 }); G.ejeX(L, x, { n: 4 });
+        tx(L.g, -L.m.l + 2, -20, nv, { 'class': 'titulo-panel' });
+        tx(L.g, -L.m.l + 2, -6, 'Barras de ' + F.pesos(ancho * 1e6), { 'class': 'sub-panel' });
+        barras(L, x, y, bs, C.obs);
+        el('line', { x1: x(0), x2: x(0), y1: 0, y2: L.h, stroke: C.tinta3, 'stroke-dasharray': '3 3' }, L.g);
+        G.linea(L, pts, x, y, { stroke: C[mod], 'stroke-width': 2.2 });
+        var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
+        G.conTip(hov, function (ev) {
+          var p = L.svg.getBoundingClientRect(), xv = x.inv((ev.clientX - p.left) * L.ancho / p.width - L.m.l), b = bs.filter(function (q) { return xv > q.a && xv <= q.b; })[0];
+          if (!b) return '';
+          return G.filas([[nv + ', ' + MOD[mod].toLowerCase()], ['Residuo entre', F.pesos(b.a * 1e6) + ' y ' + F.pesos(b.b * 1e6)], ['Observado', F.pct(100 * b.c / NJ[j])], ['Según el modelo', F.pct(100 * (T.cdf(b.b) - T.cdf(b.a)))]]);
+        });
+      });
+    }
+    G.adaptable(cont, dibujar);
+  })();
+
+  // ---- cuantiles observados y del modelo
+  (function () {
+    var cont = plot('f-cuantiles'), mod = 'nivel', Q = E.cuantiles;
+    var xm = 0; ['comun', 'nivel'].forEach(function (m) { NIV.forEach(function (nv) { xm = Math.max(xm, max(Q[m][nv].obs), max(Q[m][nv].mod)); }); });
+    segmento($('cu-mod'), 'cumod', [{ v: 'nivel', t: 'Escala por nivel' }, { v: 'comun', t: 'Escala común' }], mod, function (v) { mod = v; dibujar(); });
+    function caja(g, x, q, yy, col, claro) {
+      el('line', { x1: x(q[0]), x2: x(q[6]), y1: yy, y2: yy, stroke: col, 'stroke-width': 1.3 }, g);
+      el('rect', { x: x(q[2]), y: yy - 6, width: Math.max(1.5, x(q[4]) - x(q[2])), height: 12, fill: claro, stroke: col, 'stroke-width': 1 }, g);
+      el('line', { x1: x(q[3]), x2: x(q[3]), y1: yy - 6, y2: yy + 6, stroke: col, 'stroke-width': 2.2 }, g);
+    }
+    function dibujar() {
+      cont.innerHTML = '';
+      G.claves(ley('f-cuantiles'), [{ tipo: 'barra', color: C.obs, texto: 'Observado' }, { tipo: 'barra', color: mod === 'nivel' ? C.nivelClaro : C.comunClaro, texto: 'Según el modelo con ' + MOD[mod].toLowerCase() }]);
+      var fila = 40, ml = cont.clientWidth < 460 ? 118 : 150, L = G.lienzo(cont, { alto: NIV.length * fila + 44, m: { t: 4, r: 14, b: 38, l: ml } });
+      var x = G.escala(0, Math.ceil(xm), 0, L.w);
+      G.ejeX(L, x, { n: 7, dec: 0, rejilla: true, titulo: 'Millones de pesos' });
+      NIV.forEach(function (nv, i) {
+        var yc = i * fila + fila / 2, q = Q[mod][nv], g = el('g', null, L.g);
+        tx(L.g, -10, yc + 4, nv, { 'text-anchor': 'end', 'class': 'etq-2' });
+        caja(g, x, q.obs, yc - 7, C.obs2, C.obs);
+        caja(g, x, q.mod, yc + 7, C[mod], mod === 'nivel' ? C.nivelClaro : C.comunClaro);
+        var hit = el('rect', { x: 0, y: yc - fila / 2, width: L.w, height: fila, 'class': 'zona-hover' }, g);
+        G.conTip(hit, function () {
+          return G.filas([[nv + ': observado / modelo']].concat(q.orden.map(function (o, k) { return ['Percentil ' + F.num(o * 100), F.pesosM(q.obs[k]) + ' / ' + F.pesosM(q.mod[k])]; })));
+        });
+      });
+      var filasT = NIV.map(function (nv) { var q = Q[mod][nv]; return [nv].concat(q.orden.map(function (o, k) { return F.pesosM(q.obs[k]) + ' / ' + F.pesosM(q.mod[k]); })); });
+      G.tabla(tablaFig('f-cuantiles'), ['Nivel (observado / modelo)'].concat(Q[mod][NIV[0]].orden.map(function (o) { return 'P' + F.num(o * 100); })), filasT);
+    }
+    G.adaptable(cont, dibujar);
+  })();
+
+  // ---- tabla del centro
+  (function () {
+    var Cn = E.centro;
+    G.tabla($('t-centro'), ['Nivel', 'Común: % bajo la moda (obs. / modelo)', 'Común: % a menos de $50.000 (obs. / modelo)', 'Por nivel: % bajo la moda (obs. / modelo)', 'Por nivel: % a menos de $50.000 (obs. / modelo)'],
+      NIVT.map(function (nv, i) {
+        var a = Cn.comun[i], b = Cn.nivel[i];
+        return [nv === 'Total' ? 'Todos los niveles' : nv, F.num(a.bajo_obs, 1) + ' / ' + F.num(a.bajo_mod, 1), F.num(100 * a.masa_obs, 1) + ' / ' + F.num(100 * a.masa_mod, 1),
+          F.num(b.bajo_obs, 1) + ' / ' + F.num(b.bajo_mod, 1), F.num(100 * b.masa_obs, 1) + ' / ' + F.num(100 * b.masa_mod, 1)];
+      }));
+  })();
+
+  // ================================================================= 6. INFERENCIA
+  var INF = {}; D.inferencia.forEach(function (r) { (INF[r.modelo] = INF[r.modelo] || {})[r.par] = r; });
+  var MCO = {}; D.mco.coef.forEach(function (r) { if (r.esp === 'B') MCO[r.par] = r; });
+  var BETAS = [['(Intercept)', 'Intercepto'], ['nivel_eduMedia incompleta', 'Media incompleta'], ['nivel_eduMedia completa', 'Media completa'], ['nivel_eduSuperior incompleta', 'Superior incompleta'],
+    ['nivel_eduTécnico completo', 'Técnico completo'], ['nivel_eduProfesional completo', 'Profesional completo'], ['nivel_eduPostgrado completo', 'Postgrado completo'],
+    ['edad', 'Edad (por año)'], ['horas_trab', 'Horas semanales (por hora)'], ['sexo_fHombre', 'Hombre'], ['tam_empresaPequeña (10 a 49)', 'Pequeña (10 a 49)'],
+    ['tam_empresaMediana (50 a 199)', 'Mediana (50 a 199)'], ['tam_empresaGrande (200 o más)', 'Grande (200 o más)']];
+
+  // ---- coeficientes (bosque)
+  (function () {
+    var cont = plot('f-coef');
+    G.claves(ley('f-coef'), [{ tipo: 'hueco', color: C.comun, texto: 'Escala común' }, { tipo: 'punto', color: C.nivel, texto: 'Escala por nivel' }]);
+    var bloques = [['Nivel educacional (respecto de básica o menos)', BETAS.slice(1, 7)], ['Sexo y tamaño de empresa (respecto de mujer y microempresa)', BETAS.slice(9, 13)],
+      ['Edad', [BETAS[7]]], ['Horas semanales', [BETAS[8]]]];
+    G.adaptable(cont, function () {
+      var ps = G.paneles(cont, 4);
+      bloques.forEach(function (bl, k) {
+        var fila = 40, ml = k >= 2 ? 80 : 138, vals = [];
+        bl[1].forEach(function (b) { ['comun', 'nivel'].forEach(function (m) { var r = INF[m][b[0]]; vals.push(r.ic_inf * 1000, r.ic_sup * 1000); }); });
+        var lo = Math.min(0, min(vals)), hi = max(vals), pad = (hi - lo) * 0.06;
+        var L = G.lienzo(ps[k], { alto: bl[1].length * fila + 70, m: { t: 28, r: 16, b: 40, l: ml } });
+        var x = G.escala(lo - (lo < 0 ? pad : 0), hi + pad, 0, L.w);
+        var unidad = k >= 2 ? 'Pesos' : 'Miles de pesos', esc = k >= 2 ? 1000 : 1;
+        G.ejeX(L, x, { n: 4, rejilla: true, titulo: unidad, formato: function (v) { return F.num(v * esc, k >= 2 ? 0 : (x.dom[1] - x.dom[0] < 50 ? 1 : 0)); } });
+        tx(L.g, -ml, -12, bl[0], { 'class': 'titulo-panel' });
+        if (x.dom[0] <= 0) el('line', { x1: x(0), x2: x(0), y1: 0, y2: L.h, stroke: C.tinta3 }, L.g);
+        bl[1].forEach(function (b, i) {
+          var yc = i * fila + fila / 2;
+          tx(L.g, -10, yc + 4, k === 2 ? 'Por año' : k === 3 ? 'Por hora' : b[1], { 'text-anchor': 'end', 'class': 'etq-2' });
+          ['comun', 'nivel'].forEach(function (m, j) {
+            var r = INF[m][b[0]], yy = yc + (j === 0 ? -6 : 6), col = C[m];
+            el('line', { x1: x(r.ic_inf * 1000), x2: x(r.ic_sup * 1000), y1: yy, y2: yy, stroke: col, 'stroke-width': 2 }, L.g);
+            var c = el('circle', { cx: x(r.est * 1000), cy: yy, r: 4.6, fill: m === 'comun' ? '#fff' : col, stroke: col, 'stroke-width': 2 }, L.g);
+            G.conTip(c, function () {
+              var f = function (v) { return F.pesos(v * 1e6); };
+              return G.filas([[b[1] + ', ' + MOD[m].toLowerCase()], ['Estimación', f(r.est)], ['Intervalo de 95 %', f(r.ic_inf) + ' a ' + f(r.ic_sup)], ['EE<sub>C</sub>', f(r.ee_c)]]);
+            });
+          });
+        });
+      });
+    });
+  })();
+
+  // ---- tabla de coeficientes
+  (function () {
+    var ee = 'ee_c', NOM = { ee_c: 'EE<sub>C</sub>', ee_s: 'EE<sub>S</sub>', ee_i: 'EE<sub>I</sub>' };
+    function mil(v) { return F.num(v * 1000, Math.abs(v) < 0.01 ? 2 : 1); }
+    function dibujar() {
+      var filasT = [], clases = [];
+      filasT.push(['Coeficientes de regresión (miles de pesos)', '', '', '', '', '']); clases.push('grupo');
+      BETAS.forEach(function (b) {
+        var m0 = MCO[b[0]], a = INF.comun[b[0]], c = INF.nivel[b[0]];
+        filasT.push([b[1], mil(m0.est) + ' (' + mil(m0.ee) + ')', mil(a.est) + ' (' + mil(a[ee]) + ')', mil(a.ic_inf) + ' a ' + mil(a.ic_sup), mil(c.est) + ' (' + mil(c[ee]) + ')', mil(c.ic_inf) + ' a ' + mil(c.ic_sup)]);
+        clases.push('');
+      });
+      filasT.push(['Parámetros del error', '', '', '', '', '']); clases.push('grupo');
+      var s0 = INF.comun.sigma2;
+      filasT.push(['σ² (común)', '', F.num(s0.est, 5) + ' (' + F.num(s0[ee], 5) + ')', F.num(s0.ic_inf, 5) + ' a ' + F.num(s0.ic_sup, 5), '', '']); clases.push('');
+      NIV.forEach(function (nv) { var r = INF.nivel['sigma2 [' + nv + ']']; filasT.push(['σ²: ' + nv.toLowerCase(), '', '', '', F.num(r.est, 5) + ' (' + F.num(r[ee], 5) + ')', F.num(r.ic_inf, 5) + ' a ' + F.num(r.ic_sup, 5)]); clases.push(''); });
+      ['alpha', 'nu'].forEach(function (p) {
+        var a = INF.comun[p], c = INF.nivel[p];
+        filasT.push([p === 'alpha' ? 'α' : 'ν', '', F.num(a.est, 3) + ' (' + F.num(a[ee], 3) + ')', F.num(a.ic_inf, 3) + ' a ' + F.num(a.ic_sup, 3), F.num(c.est, 3) + ' (' + F.num(c[ee], 3) + ')', F.num(c.ic_inf, 3) + ' a ' + F.num(c.ic_sup, 3)]); clases.push('');
+      });
+      G.tabla($('t-coef'), ['Parámetro', 'Regresión normal', 'Escala común (' + NOM[ee] + ')', 'Intervalo de 95 %', 'Escala por nivel (' + NOM[ee] + ')', 'Intervalo de 95 %'], filasT, { clase: function (k) { return clases[k]; } });
+    }
+    segmento($('tc-ee'), 'tcee', [{ v: 'ee_c', t: 'Sándwich por conglomerado' }, { v: 'ee_s', t: 'Sándwich individual' }, { v: 'ee_i', t: 'Información observada' }], ee, function (v) { ee = v; dibujar(); });
+    dibujar();
+  })();
+
+  // ---- razones entre errores estándar
+  (function () {
+    var cont = plot('f-razones'), pars = BETAS.concat([['alpha', 'α'], ['nu', 'ν']]);
+    G.claves(ley('f-razones'), [{ tipo: 'hueco', color: C.comun, texto: 'Escala común' }, { tipo: 'punto', color: C.nivel, texto: 'Escala por nivel' }]);
+    var todos = []; pars.forEach(function (p) { ['comun', 'nivel'].forEach(function (m) { todos.push(INF[m][p[0]].r1, INF[m][p[0]].r2); }); });
+    G.adaptable(cont, function () {
+      var ps = G.paneles(cont, 2), una = getComputedStyle(cont).gridTemplateColumns.split(' ').length === 1;
+      [['r1', '(a) EE<tspan baseline-shift="sub" font-size="9">S</tspan> / EE<tspan baseline-shift="sub" font-size="9">I</tspan>'], ['r2', '(b) EE<tspan baseline-shift="sub" font-size="9">C</tspan> / EE<tspan baseline-shift="sub" font-size="9">S</tspan>']].forEach(function (rz, k) {
+        var fila = 24, ml = (k === 0 || una) ? 150 : 12;
+        var L = G.lienzo(ps[k], { alto: pars.length * fila + 64, m: { t: 24, r: 10, b: 40, l: ml } });
+        var x = G.escala(0.8, Math.ceil(max(todos) * 2) / 2, 0, L.w);
+        G.ejeX(L, x, { n: 5, rejilla: true, dec: 1 });
+        tx(L.g, 0, -10, '', { 'class': 'titulo-panel' }).innerHTML = rz[1];
+        el('line', { x1: x(1), x2: x(1), y1: 0, y2: L.h, stroke: C.tinta3, 'stroke-dasharray': '4 3' }, L.g);
+        pars.forEach(function (p, i) {
+          var yc = i * fila + fila / 2;
+          if (ml > 20) tx(L.g, -10, yc + 4, p[1].replace(' (por año)', '').replace(' (por hora)', ''), { 'text-anchor': 'end', 'class': 'etq-2' });
+          el('line', { x1: 0, x2: L.w, y1: yc, y2: yc, stroke: '#f0f2f4' }, L.g);
+          ['comun', 'nivel'].forEach(function (m) {
+            var r = INF[m][p[0]], c = el('circle', { cx: x(r[rz[0]]), cy: yc, r: 4.4, fill: m === 'comun' ? '#fff' : C[m], stroke: C[m], 'stroke-width': 2 }, L.g);
+            G.conTip(c, function () { return G.filas([[p[1] + ', ' + MOD[m].toLowerCase()], ['EE<sub>S</sub> / EE<sub>I</sub>', F.num(r.r1, 2)], ['EE<sub>C</sub> / EE<sub>S</sub>', F.num(r.r2, 2)]]); });
+          });
+        });
+      });
+    });
+  })();
+
+  // ---- escalas por nivel con intervalos
+  (function () {
+    var cont = plot('f-escalas'), T = E.nivel_tab, c0 = T.comun[0];
+    G.claves(ley('f-escalas'), [{ tipo: 'hueco', color: C.nivel, texto: 'Bajo la moda' }, { tipo: 'punto', color: C.nivel, texto: 'Sobre la moda' }, { tipo: 'discontinua', color: C.comun, texto: 'Escalas del modelo con escala común' }]);
+    G.adaptable(cont, function () {
+      cont.innerHTML = '';
+      var fila = 36, ml = cont.clientWidth < 460 ? 118 : 138, L = G.lienzo(cont, { alto: NIV.length * fila + 44, m: { t: 8, r: 14, b: 38, l: ml } });
+      var x = G.escala(0, 1300, 0, L.w);
+      G.ejeX(L, x, { ticks: [0, 250, 500, 750, 1000, 1250], dec: 0, rejilla: true, titulo: 'Miles de pesos' });
+      [c0.bajo, c0.sobre].forEach(function (v) { el('line', { x1: x(v * 1000), x2: x(v * 1000), y1: 0, y2: L.h, stroke: C.comun, 'stroke-dasharray': '5 3', 'stroke-width': 1.4 }, L.g); });
+      T.nivel.forEach(function (r, i) {
+        var yc = i * fila + fila / 2;
+        tx(L.g, -10, yc + 4, r.nivel, { 'text-anchor': 'end', 'class': 'etq-2' });
+        [['bajo', 'ee_bajo', -5, 'Bajo la moda'], ['sobre', 'ee_sobre', 5, 'Sobre la moda']].forEach(function (q) {
+          var v = r[q[0]] * 1000, e = r[q[1]] * 1000, yy = yc + q[2];
+          el('line', { x1: x(v - 1.96 * e), x2: x(v + 1.96 * e), y1: yy, y2: yy, stroke: C.nivel, 'stroke-width': 2 }, L.g);
+          var c = el('circle', { cx: x(v), cy: yy, r: 4.4, fill: q[0] === 'bajo' ? '#fff' : C.nivel, stroke: C.nivel, 'stroke-width': 2 }, L.g);
+          G.conTip(c, function () { return G.filas([[r.nivel + ': escala ' + q[3].toLowerCase()], ['Estimación', F.mil(v / 1000)], ['Intervalo de 95 %', F.mil((v - 1.96 * e) / 1000) + ' a ' + F.mil((v + 1.96 * e) / 1000)]]); });
+        });
+      });
+    });
+    G.tabla(tablaFig('f-escalas'), ['Nivel', 'σ̂<sub>j</sub>', 'Escala bajo la moda', 'Intervalo', 'Escala sobre la moda', 'Intervalo'], T.nivel.map(function (r) {
+      return [r.nivel, F.mil(r.sigma), F.mil(r.bajo), F.mil(r.bajo - 1.96 * r.ee_bajo) + ' a ' + F.mil(r.bajo + 1.96 * r.ee_bajo), F.mil(r.sobre), F.mil(r.sobre - 1.96 * r.ee_sobre) + ' a ' + F.mil(r.sobre + 1.96 * r.ee_sobre)];
+    }));
+  })();
+
+  // ---- moda, mediana y media por nivel
+  (function () {
+    var cont = plot('f-medidas'), mod = 'nivel', T = E.nivel_tab;
+    segmento($('me-mod'), 'memod', [{ v: 'nivel', t: 'Escala por nivel' }, { v: 'comun', t: 'Escala común' }], mod, function (v) { mod = v; dibujar(); });
+    function dibujar() {
+      cont.innerHTML = '';
+      var col = C[mod];
+      G.claves(ley('f-medidas'), [{ tipo: 'hueco', color: col, texto: 'Moda (promedio del nivel)' }, { tipo: 'punto', color: col, texto: 'Mediana' }, { tipo: 'barra', color: col, texto: 'Media según el modelo' }, { tipo: 'rombo', color: C.obs2, texto: 'Media observada' }]);
+      var fila = 36, ml = cont.clientWidth < 460 ? 118 : 138, L = G.lienzo(cont, { alto: NIV.length * fila + 44, m: { t: 8, r: 14, b: 38, l: ml } });
+      var x = G.escala(0, 2600, 0, L.w);
+      G.ejeX(L, x, { ticks: [0, 500, 1000, 1500, 2000, 2500], dec: 0, rejilla: true, titulo: 'Miles de pesos' });
+      T[mod].forEach(function (r, i) {
+        var yc = i * fila + fila / 2, moda = r.moda_media * 1000, med = (r.moda_media + r.med_err) * 1000, media = r.media_aj * 1000, obs = r.media_obs * 1000;
+        tx(L.g, -10, yc + 4, r.nivel, { 'text-anchor': 'end', 'class': 'etq-2' });
+        el('line', { x1: x(moda), x2: x(media), y1: yc, y2: yc, stroke: col, 'stroke-width': 1.5, 'stroke-opacity': 0.6 }, L.g);
+        el('circle', { cx: x(moda), cy: yc, r: 5, fill: '#fff', stroke: col, 'stroke-width': 2 }, L.g);
+        el('circle', { cx: x(med), cy: yc, r: 3.6, fill: col }, L.g);
+        el('rect', { x: x(media) - 2, y: yc - 7, width: 4, height: 14, fill: col, rx: 1 }, L.g);
+        el('rect', { x: x(obs) - 4.5, y: yc - 4.5, width: 9, height: 9, fill: C.obs2, transform: 'rotate(45 ' + x(obs) + ' ' + yc + ')' }, L.g);
+        var hit = el('rect', { x: 0, y: yc - fila / 2, width: L.w, height: fila, 'class': 'zona-hover' }, L.g);
+        G.conTip(hit, function () { return G.filas([[r.nivel + ', ' + MOD[mod].toLowerCase()], ['Moda (promedio)', F.mil(r.moda_media)], ['Mediana', F.mil(r.moda_media + r.med_err)], ['Media según el modelo', F.mil(r.media_aj)], ['Media observada', F.mil(r.media_obs)]]); });
+      });
+      G.tabla(tablaFig('f-medidas'), ['Nivel', 'Moda (promedio)', 'Mediana del error', 'Media del error', 'Media según el modelo', 'Media observada'], T[mod].map(function (r) {
+        return [r.nivel, F.mil(r.moda_media), F.mil(r.med_err), F.mil(r.media_err), F.mil(r.media_aj), F.mil(r.media_obs)];
+      }));
+    }
+    G.adaptable(cont, dibujar);
+  })();
+
+  // ---- diferencias de medias
+  (function () {
+    var cont = plot('f-diferencias'), mod = 'nivel';
+    segmento($('di-mod'), 'dimod', [{ v: 'nivel', t: 'Escala por nivel' }, { v: 'comun', t: 'Escala común' }], mod, function (v) { mod = v; dibujar(); });
+    function dibujar() {
+      cont.innerHTML = '';
+      var col = C[mod], claro = mod === 'nivel' ? C.nivelClaro : C.comunClaro;
+      G.claves(ley('f-diferencias'), [{ tipo: 'barra', color: col, texto: 'Coeficiente (diferencia de modas)' }, { tipo: 'barra', color: claro, texto: 'Diferencia entre las medias del error' }, { tipo: 'rombo', color: C.mco, texto: 'Regresión normal' }]);
+      var ds = D.diferencias.filter(function (d) { return d.modelo === mod; });
+      var fila = 36, ml = cont.clientWidth < 460 ? 118 : 138, L = G.lienzo(cont, { alto: ds.length * fila + 50, m: { t: 14, r: 70, b: 38, l: ml } });
+      var x = G.escala(0, 2000, 0, L.w);
+      G.ejeX(L, x, { ticks: [0, 500, 1000, 1500, 2000], dec: 0, rejilla: true, titulo: 'Miles de pesos' });
+      tx(L.g, L.w + L.m.r - 2, -2, 'Total', { 'class': 'etq-2', 'text-anchor': 'end', 'font-weight': 600 });
+      ds.forEach(function (d, i) {
+        var yc = i * fila + fila / 2, c = d.coef * 1000, e = d.dif_err * 1000, t = d.dif * 1000, m0 = MCO['nivel_edu' + d.nivel].est * 1000;
+        tx(L.g, -10, yc + 4, d.nivel, { 'text-anchor': 'end', 'class': 'etq-2' });
+        el('rect', { x: x(0), y: yc - 8, width: Math.max(0, x(c) - x(0)), height: 16, fill: col }, L.g);
+        if (Math.abs(e) > 1e-9) el('rect', { x: Math.min(x(c), x(c + e)), y: yc - 8, width: Math.abs(x(c + e) - x(c)), height: 16, fill: claro }, L.g);
+        el('rect', { x: x(m0) - 5, y: yc - 5, width: 10, height: 10, fill: C.mco, stroke: '#fff', 'stroke-width': 1, transform: 'rotate(45 ' + x(m0) + ' ' + yc + ')' }, L.g);
+        tx(L.g, L.w + L.m.r - 2, yc + 4, F.num(t, 1), { 'class': 'etq', 'font-weight': 600, 'text-anchor': 'end' });
+        var hit = el('rect', { x: 0, y: yc - fila / 2, width: L.w, height: fila, 'class': 'zona-hover' }, L.g);
+        G.conTip(hit, function () { return G.filas([[d.nivel + ' frente a básica o menos'], ['Coeficiente', F.mil(d.coef)], ['Diferencia de medias del error', F.mil(d.dif_err)], ['Diferencia de medias', F.mil(d.dif)], ['Regresión normal', F.mil(MCO['nivel_edu' + d.nivel].est)]]); });
+      });
+      G.tabla(tablaFig('f-diferencias'), ['Nivel', 'Coeficiente', 'Diferencia de medias del error', 'Diferencia de medias', 'Regresión normal'], ds.map(function (d) {
+        return [d.nivel, F.mil(d.coef), F.mil(d.dif_err), F.mil(d.dif), F.mil(MCO['nivel_edu' + d.nivel].est)];
+      }));
+    }
+    G.adaptable(cont, dibujar);
+  })();
+
+  // ---- participación de cada nivel en la estimación de beta
+  (function () {
+    var cont = plot('f-pesobeta'), P = E.pesos_nivel;
+    G.claves(ley('f-pesobeta'), [{ tipo: 'barra', color: C.comun, texto: 'Escala común' }, { tipo: 'barra', color: C.nivel, texto: 'Escala por nivel' }]);
+    G.adaptable(cont, function () {
+      cont.innerHTML = '';
+      var fila = 34, ml = cont.clientWidth < 460 ? 118 : 150, L = G.lienzo(cont, { alto: NIV.length * fila + 44, m: { t: 6, r: 52, b: 38, l: ml } });
+      var x = G.escala(0, 60, 0, L.w);
+      G.ejeX(L, x, { ticks: L.w < 360 ? [0, 20, 40, 60] : [0, 10, 20, 30, 40, 50, 60], formato: function (v) { return v + ' %'; }, rejilla: true, titulo: 'Porcentaje de la suma de los pesos' });
+      NIV.forEach(function (nv, i) {
+        var yc = i * fila + fila / 2;
+        tx(L.g, -10, yc + 4, nv, { 'text-anchor': 'end', 'class': 'etq-2' });
+        ['comun', 'nivel'].forEach(function (mod, k) {
+          var v = P[mod][i].beta, yy = yc + (k === 0 ? -12 : 1);
+          var r = el('rect', { x: 0, y: yy, width: x(v), height: 11, fill: C[mod], rx: 1 }, L.g);
+          tx(L.g, x(v) + 5, yy + 9.5, F.pct(v), { 'class': 'etq-2' });
+          G.conTip(r, function () { return G.filas([[nv + ', ' + MOD[mod].toLowerCase()], ['Participación', F.pct(v, 2)]]); });
+        });
+      });
+    });
+    G.tabla(tablaFig('f-pesobeta'), ['Nivel', 'Escala común', 'Escala por nivel'], NIV.map(function (nv, i) { return [nv, F.pct(P.comun[i].beta, 2), F.pct(P.nivel[i].beta, 2)]; }));
+  })();
+
+  // ================================================================= 7. SUELDO SEGÚN PERFIL
+  (function () {
+    var mod = 'nivel', comparar = false, monto = 1000000;
+    var perfiles = [{ nivel: 'Media completa', sexo: 'Mujer', tam: 'Grande (200 o más)', edad: 35, horas: 44 },
+      { nivel: 'Profesional completo', sexo: 'Mujer', tam: 'Grande (200 o más)', edad: 35, horas: 44 }];
+    var etiquetas = ['Perfil A', 'Perfil B'];
+    var OPS = [{ v: 'nivel', t: 'TP-<i>t</i> con escala por nivel <small>(modelo final)</small>' }, { v: 'comun', t: 'TP-<i>t</i> con escala común' }, { v: 'mco', t: 'Regresión normal (MCO)' }];
+    segmento($('pf-mod'), 'pfmod', OPS, mod, function (v) { mod = v; calcular(); });
+    function construir(k) {
+      var cont = $(k === 0 ? 'perfil-a' : 'perfil-b'), p = perfiles[k], id = 'pf' + k;
+      cont.innerHTML = '<h4>' + etiquetas[k] + '</h4>' +
+        '<label class="campo"><span>Nivel educacional</span><select id="' + id + '-niv">' + NIV.map(function (n) { return '<option>' + n + '</option>'; }).join('') + '</select></label>' +
+        '<div class="campo"><span id="' + id + '-sx-r">Sexo</span><div class="segmento" role="radiogroup" aria-labelledby="' + id + '-sx-r" id="' + id + '-sx"></div></div>' +
+        '<label class="campo"><span>Tamaño de empresa</span><select id="' + id + '-tam">' + TAM.map(function (t) { return '<option>' + t + '</option>'; }).join('') + '</select></label>' +
+        '<label class="campo"><span>Edad</span><span class="rango"><input type="range" id="' + id + '-ed" min="18" max="64" step="1"><output id="' + id + '-ed-o"></output></span></label>' +
+        '<label class="campo"><span>Horas semanales</span><span class="rango"><input type="range" id="' + id + '-hr" min="40" max="84" step="1"><output id="' + id + '-hr-o"></output></span></label>';
+      $(id + '-niv').value = p.nivel; $(id + '-tam').value = p.tam; $(id + '-ed').value = p.edad; $(id + '-hr').value = p.horas;
+      segmento($(id + '-sx'), id + 'sx', [{ v: 'Mujer', t: 'Mujer' }, { v: 'Hombre', t: 'Hombre' }], p.sexo, function (v) { p.sexo = v; limitar(); calcular(); });
+      $(id + '-niv').addEventListener('change', function (e) { p.nivel = e.target.value; calcular(); });
+      $(id + '-tam').addEventListener('change', function (e) { p.tam = e.target.value; calcular(); });
+      $(id + '-ed').addEventListener('input', function (e) { p.edad = +e.target.value; calcular(); });
+      $(id + '-hr').addEventListener('input', function (e) { p.horas = +e.target.value; calcular(); });
+      function limitar() { var e = $(id + '-ed'); e.max = p.sexo === 'Mujer' ? 59 : 64; if (p.edad > +e.max) { p.edad = +e.max; e.value = p.edad; } }
+      limitar();
+    }
+    construir(0); construir(1);
+    $('pf-comparar').addEventListener('change', function (e) { comparar = e.target.checked; $('perfil-b').hidden = !comparar; calcular(); });
+    var mIn = $('pf-monto');
+    mIn.addEventListener('input', function () { monto = +mIn.value; calcular(); });
+
+    function distribucion(p) {
+      var B = mod === 'mco' ? MCO : INF[mod], g = function (k) { return B[k] ? B[k].est : 0; };
+      var mu = g('(Intercept)') + g('nivel_edu' + p.nivel) + g('edad') * p.edad + g('horas_trab') * p.horas + (p.sexo === 'Hombre' ? g('sexo_fHombre') : 0) + g('tam_empresa' + p.tam);
+      var e;
+      if (mod === 'mco') e = M.tp('N', D.mco.ajuste[1].sigma, 0, {});
+      else if (mod === 'comun') e = M.tp('T', Math.sqrt(INF.comun.sigma2.est), INF.comun.alpha.est, { nu: INF.comun.nu.est });
+      else e = M.tp('T', Math.sqrt(INF.nivel['sigma2 [' + p.nivel + ']'].est), INF.nivel.alpha.est, { nu: INF.nivel.nu.est });
+      var q = {}; [0.05, 0.25, 0.5, 0.75, 0.95].forEach(function (o) { q[o] = mu + e.cuantil(o); });
+      return { mu: mu, e: e, q: q, media: mu + e.media(), dens: function (y) { return e.dens(y - mu); }, sup: function (y) { return e.sup(y - mu); } };
+    }
+    function calcular() {
+      [0, 1].forEach(function (k) { var id = 'pf' + k, p = perfiles[k]; $(id + '-ed-o').textContent = p.edad + ' años'; $(id + '-hr-o').textContent = p.horas + ' h'; });
+      $('pf-monto-o').textContent = F.pesos(monto);
+      var ds = [distribucion(perfiles[0])].concat(comparar ? [distribucion(perfiles[1])] : []), col = C[mod];
+      var filasR = [['Moda', function (d) { return F.pesosM(d.mu); }], ['Mediana', function (d) { return F.pesosM(d.q[0.5]); }], ['Media', function (d) { return F.pesosM(d.media); }],
+        ['50 % central', function (d) { return F.pesosM(d.q[0.25]) + ' <span class="hasta"><small>a</small> ' + F.pesosM(d.q[0.75]) + '</span>'; }],
+        ['90 % central', function (d) { return F.pesosM(d.q[0.05]) + ' <span class="hasta"><small>a</small> ' + F.pesosM(d.q[0.95]) + '</span>'; }]];
+      $('pf-resumen').innerHTML = '<table><thead><tr><th></th>' + ds.map(function (d, k) {
+        return '<th><i class="mk" style="border-top:3px ' + (k === 0 ? 'solid' : 'dashed') + ' ' + col + '"></i>' + etiquetas[k] + '</th>';
+      }).join('') + '</tr></thead><tbody>' + filasR.map(function (f) { return '<tr><td>' + f[0] + '</td>' + ds.map(function (d) { return '<td class="v">' + f[1](d) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>';
+      $('pf-monto-r').innerHTML = ds.map(function (d, k) { return etiquetas[k] + ': <b>' + F.pct(100 * d.sup(monto / 1e6)) + '</b>'; }).join('&emsp;');
+      G.claves(ley('f-perfil'), ds.map(function (d, k) { return { tipo: k === 0 ? 'linea' : 'discontinua', color: col, texto: etiquetas[k] }; }));
+      dibujarDens(ds, col);
+    }
+    var cont = plot('f-perfil'), ultimo = null;
+    function dibujarDens(ds, col) {
+      ultimo = [ds, col];
+      cont.innerHTML = '';
+      var lo = min(ds.map(function (d) { return d.mu + d.e.cuantil(0.005); })), hi = max(ds.map(function (d) { return d.q[0.95] + 0.35 * (d.q[0.95] - d.mu); }));
+      lo = Math.max(lo, mod === 'mco' ? -1 : 0); lo = Math.min(lo, 0.2);
+      var L = G.lienzo(cont, { alto: function (w) { return Math.max(240, Math.min(330, w * 0.42)); }, m: { t: 30, r: 12, b: 40, l: 14 } });
+      var x = G.escala(lo, hi, 0, L.w), ym = 0, curvas = ds.map(function (d) {
+        var pts = []; for (var i = 0; i <= 500; i++) { var v = lo + (hi - lo) * i / 500; pts.push([v, d.dens(v)]); } pts.push([d.mu, d.dens(d.mu)]); pts.sort(function (a, b) { return a[0] - b[0]; });
+        ym = Math.max(ym, d.dens(d.mu)); return pts;
+      });
+      var y = G.escala(0, ym * 1.08, L.h, 0);
+      G.ejeX(L, x, { n: 6, rejilla: true, titulo: 'Sueldo líquido mensual (millones de pesos)' });
+      ds.forEach(function (d, k) {
+        var pts = curvas[k];
+        if (k === 0) {
+          G.area(L, pts.filter(function (p) { return p[0] >= d.q[0.05] && p[0] <= d.q[0.95]; }), x, y, 0, { fill: col, 'fill-opacity': 0.13 });
+          G.area(L, pts.filter(function (p) { return p[0] >= d.q[0.25] && p[0] <= d.q[0.75]; }), x, y, 0, { fill: col, 'fill-opacity': 0.25 });
+        }
+        G.linea(L, pts, x, y, { stroke: col, 'stroke-width': 2.4, 'stroke-dasharray': k === 0 ? null : '6 4' });
+        el('line', { x1: x(d.mu), x2: x(d.mu), y1: y(d.dens(d.mu)), y2: L.h, stroke: col, 'stroke-width': 1.2 }, L.g);
+        if (ds.length === 1) {
+          var xm = x(d.mu), anc = xm < 90 ? 'start' : xm > L.w - 90 ? 'end' : 'middle';
+          tx(L.g, xm + (anc === 'start' ? -4 : anc === 'end' ? 4 : 0), y(d.dens(d.mu)) - 8, 'Moda ' + F.pesosM(d.mu), { 'text-anchor': anc, 'class': 'etq', 'font-weight': 600 });
+        }
+      });
+      if (monto / 1e6 > lo && monto / 1e6 < hi) {
+        el('line', { x1: x(monto / 1e6), x2: x(monto / 1e6), y1: 0, y2: L.h, stroke: C.tinta, 'stroke-dasharray': '3 3' }, L.g);
+        tx(L.g, x(monto / 1e6) + 5, 12, F.pesos(monto), { 'class': 'etq-2' });
+      }
+      var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
+      G.conTip(hov, function (ev) {
+        var p = L.svg.getBoundingClientRect(), xv = x.inv((ev.clientX - p.left) * L.ancho / p.width - L.m.l);
+        return G.filas([['Sueldo de ' + F.pesosM(xv)]].concat(ds.map(function (d, k) { return [etiquetas[k] + ': gana más', F.pct(100 * d.sup(xv))]; })));
+      });
+    }
+    G.adaptable(cont, function () { if (ultimo) dibujarDens(ultimo[0], ultimo[1]); });
+    calcular();
+  })();
 })();
