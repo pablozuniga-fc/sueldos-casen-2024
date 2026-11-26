@@ -3,7 +3,7 @@
 :root {
   --tinta: #262c33;
   --tinta-2: #4b5560;
-  --tinta-3: #6b7581;
+  --tinta-3: #5d6671;          /* notas y ejes: 5,8:1 sobre blanco y 5,3:1 sobre los paneles */
   --pizarra: #394049;          /* gris USACH */
   --pizarra-honda: #2b3138;
   --naranja: #e77500;          /* naranja USACH (marca) */
@@ -17,6 +17,7 @@
   --obs-2: #7d8691;
   --linea: #dde2e7;
   --linea-2: #c9d0d8;
+  --borde: #8a94a0;            /* bordes de los controles y contorno de las barras: 3,1:1 sobre blanco */
   --niebla: #f3f5f7;
   --fondo: #ffffff;
   --radio: 6px;
@@ -65,7 +66,8 @@ table, .num { font-variant-numeric: tabular-nums; }
 .boton:hover { background: rgba(255, 255, 255, .08); color: #fff; }
 .boton.primario { background: var(--naranja); border-color: var(--naranja); color: #1d2228; }
 .boton.primario:hover { background: #f58a1f; color: #1d2228; }
-.boton.chico { color: var(--tinta); border-color: var(--linea-2); padding: 6px 12px; font-size: 14px; background: #fff; }
+.boton.chico { color: var(--tinta); border-color: var(--borde); padding: 6px 12px; font-size: 14px; background: #fff; }
+.botones { display: flex; flex-wrap: wrap; gap: 8px; }
 .boton.chico:hover { border-color: var(--pizarra); background: var(--niebla); color: var(--tinta); }
 .portada-fig { margin: 0; }
 .portada-fig figcaption { font-size: 13.5px; color: #aeb6c0; margin-top: 8px; line-height: 1.45; }
@@ -73,10 +75,13 @@ table, .num { font-variant-numeric: tabular-nums; }
 
 /* ---------------------------------------------------------------- resultados principales */
 .hallazgos { padding: clamp(40px, 5vw, 60px) 0 clamp(28px, 4vw, 44px); border-bottom: 1px solid var(--linea); }
-.hallazgos h2 { font-size: clamp(26px, 2.6vw, 34px); font-weight: 400; margin-bottom: 26px; }
+.hallazgos h2 { font-size: clamp(26px, 2.6vw, 34px); font-weight: 400; margin-bottom: 10px; }
+.hallazgos-alcance { font-size: 15.5px; color: var(--tinta-2); margin-bottom: 26px; max-width: 90ch; }
 .hallazgos-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; }
 .hallazgos-lista li { border-top: 3px solid var(--pizarra); padding-top: 16px; display: flex; flex-direction: column; }
 .hallazgos-lista li:first-child { border-top-color: var(--naranja); }
+.hallazgos-lista li.amplio { grid-column: 1 / -1; }
+.hallazgos-lista li.amplio p { max-width: 110ch; flex: none; }
 .hallazgos-lista h3 { font-size: 18px; font-weight: 600; margin-bottom: 10px; line-height: 1.3; }
 .hallazgos-lista p { font-size: 15.5px; color: var(--tinta-2); line-height: 1.55; flex: 1; }
 .hallazgos-lista a { font-size: 15px; font-weight: 500; }
@@ -87,7 +92,7 @@ table, .num { font-variant-numeric: tabular-nums; }
 .mk-nivel { border-color: var(--serie-nivel); }
 .mk-comun { border-color: var(--serie-comun); }
 .mk-mco { border-top: 2.5px dashed var(--serie-mco); }
-.mk-obs { height: 12px; border: 0; background: var(--obs); width: 16px; border-radius: 2px; }
+.mk-obs { height: 12px; border: 0; background: var(--obs); width: 16px; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--borde); }
 
 /* ---------------------------------------------------------------- cuerpo con índice */
 .cuerpo { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: clamp(28px, 4vw, 56px); }
@@ -100,7 +105,7 @@ table, .num { font-variant-numeric: tabular-nums; }
 .indice a:hover { color: var(--tinta); }
 .indice a.activo { border-left-color: var(--naranja); color: var(--tinta); font-weight: 500; }
 .indice a.activo span { color: var(--naranja-texto); }
-main { min-width: 0; }
+.capitulos { min-width: 0; }
 
 /* ---------------------------------------------------------------- capítulos */
 .capitulo { padding: 52px 0 20px; border-top: 1px solid var(--linea); }
@@ -115,7 +120,7 @@ main { min-width: 0; }
 .dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 36px; align-items: start; margin-bottom: 24px; }
 .dos.amplio-izq { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
 .dos.amplio-der { grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); }
-.tres-tablas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin: 8px 0 22px; }
+.tres-tablas { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 8px 0 22px; }
 .panel { background: var(--niebla); border-radius: var(--radio); padding: 22px 24px; }
 .panel h3 { font-size: 17.5px; font-weight: 600; margin-bottom: 12px; }
 .panel p:last-child { margin-bottom: 0; }
@@ -138,8 +143,9 @@ main { min-width: 0; }
 .m b { font-weight: 700; }
 .hat { position: relative; display: inline-block; }
 .hat::after { content: "ˆ"; position: absolute; left: 0.14em; right: 0; top: -0.36em; text-align: center; font-style: normal; font-weight: 400; font-size: 0.92em; line-height: 1; }
-.ecuacion { font-size: 20px; padding: 10px 0 4px; overflow-x: auto; }
+.ecuacion { font-size: 20px; padding: 10px 0 4px; overflow-x: auto; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 26px; }
 .ecuacion .m { white-space: nowrap; }
+code { font-family: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace; font-size: 0.92em; }
 .cita-ec { font-size: 14px; color: var(--tinta-3); margin: 6px 0 26px; }
 .frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.8em; line-height: 1.1; margin: 0 2px; }
 .frac span:last-child { border-top: 1px solid currentColor; }
@@ -157,7 +163,8 @@ main { min-width: 0; }
 .fig-plot svg { display: block; width: 100%; height: auto; overflow: visible; }
 .capitulo .bloque, .capitulo .dos { margin-top: 30px; }
 .rejilla-razones { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 10px 28px; }
-.pares td:first-child { white-space: normal; }
+.pares tbody td.txt:first-child { white-space: normal; }       /* los nombres largos se parten y la columna de cifras queda a la vista */
+.pares td:not(:first-child), .pares th:not(:first-child) { width: 1%; }
 .fig-nota { font-size: 14px; color: var(--tinta-3); margin: 10px 0 0; line-height: 1.5; max-width: 90ch; }
 .panel .fig-nota { margin-top: 12px; }
 .rejilla-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 28px; }
@@ -165,7 +172,6 @@ main { min-width: 0; }
 .rejilla-modelos { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px 14px; }
 .rejilla-niveles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 18px; }
 .rejilla-coef { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 10px 32px; }
-.fila-rejilla { grid-column: 1 / -1; font-size: 13.5px; font-weight: 600; color: var(--tinta-2); margin: 6px 0 -4px; }
 
 /* gráficos SVG */
 .eje text, .rot { font-family: var(--sans); font-size: 12px; fill: var(--tinta-3); font-variant-numeric: tabular-nums; }
@@ -175,20 +181,18 @@ main { min-width: 0; }
 .sub-panel { font-family: var(--sans); font-size: 12px; fill: var(--tinta-3); font-variant-numeric: tabular-nums; }
 .etq { font-family: var(--sans); font-size: 12.5px; fill: var(--tinta); font-variant-numeric: tabular-nums; }
 .etq-2 { font-family: var(--sans); font-size: 12px; fill: var(--tinta-2); font-variant-numeric: tabular-nums; }
-.blanco text { fill: #e6e9ed; }
 .portada .eje text { fill: #aeb6c0; }
 .portada .eje .dominio { stroke: #59626e; }
 .portada .rejilla line { stroke: #3a414a; }
-.marca-sel { cursor: pointer; }
 .zona-hover { fill: transparent; }
 
 /* ---------------------------------------------------------------- controles */
 .campo { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; color: var(--tinta-2); font-weight: 500; }
-select { font: inherit; font-size: 15px; font-weight: 400; color: var(--tinta); padding: 7px 34px 7px 11px; border: 1px solid var(--linea-2); border-radius: var(--radio);
+select { font: inherit; font-size: 15px; font-weight: 400; color: var(--tinta); padding: 7px 34px 7px 11px; border: 1px solid var(--borde); border-radius: var(--radio);
   background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23394049' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 11px center;
   appearance: none; -webkit-appearance: none; min-width: 210px; max-width: 100%; }
 select:hover { border-color: var(--pizarra); }
-.segmento { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--linea-2); border-radius: var(--radio); overflow: hidden; background: #fff; }
+.segmento { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--borde); border-radius: var(--radio); overflow: hidden; background: #fff; }
 .segmento input { position: absolute; opacity: 0; pointer-events: none; }
 .segmento label { padding: 7px 13px; font-size: 14px; font-weight: 400; color: var(--tinta); cursor: pointer; border-left: 1px solid var(--linea-2); line-height: 1.35; }
 .segmento label:first-of-type { border-left: 0; }
@@ -211,13 +215,21 @@ output { font-variant-numeric: tabular-nums; font-size: 14.5px; color: var(--tin
 .lectura b { display: block; font-size: 19px; font-weight: 500; color: var(--tinta); font-variant-numeric: tabular-nums; margin-top: 2px; }
 
 /* ---------------------------------------------------------------- tablas */
-.tabla-ancha { overflow-x: auto; }
+.tabla-ancha, details.fig-tabla > div { overflow-x: auto;
+  background:
+    linear-gradient(to right, var(--fondo-tabla, #fff) 40%, rgba(255, 255, 255, 0)) left center / 30px 100% no-repeat local,
+    linear-gradient(to left, var(--fondo-tabla, #fff) 40%, rgba(255, 255, 255, 0)) right center / 30px 100% no-repeat local,
+    linear-gradient(to right, rgba(38, 44, 51, .2), rgba(38, 44, 51, 0)) left center / 12px 100% no-repeat scroll,
+    linear-gradient(to left, rgba(38, 44, 51, .2), rgba(38, 44, 51, 0)) right center / 12px 100% no-repeat scroll; }
+.panel { --fondo-tabla: var(--niebla); }
+.panel.aviso { --fondo-tabla: #fff7ee; }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--linea); white-space: nowrap; }
-th { font-weight: 600; color: var(--tinta-2); border-bottom: 1.5px solid var(--linea-2); vertical-align: bottom; }
+th { font-weight: 600; color: var(--tinta-2); border-bottom: 1.5px solid var(--linea-2); vertical-align: bottom; white-space: normal; }   /* un encabezado largo se parte antes de obligar a desplazar la tabla */
 th:first-child, td:first-child { text-align: left; padding-left: 0; }
 td.txt, th.txt { text-align: left; white-space: normal; }
 tbody td.txt:first-child { white-space: nowrap; }
+tbody tr.grupo td.txt:first-child { white-space: normal; }
 tr.destacada td { background: var(--naranja-claro); font-weight: 500; }
 tr.destacada td:first-child { box-shadow: inset 3px 0 0 var(--naranja); padding-left: 8px; }
 tr.grupo td { font-weight: 600; color: var(--tinta-2); background: transparent; padding-top: 14px; }
@@ -226,15 +238,14 @@ details.fig-tabla { margin-top: 10px; }
 details.fig-tabla summary { cursor: pointer; font-size: 14px; color: var(--naranja-texto); font-weight: 500; width: max-content; max-width: 100%; }
 details.fig-tabla summary:hover { color: var(--tinta); }
 details.fig-tabla[open] summary { margin-bottom: 10px; }
-details.fig-tabla > div { overflow-x: auto; }
-.matriz td.c { text-align: center; }
+details.fig-tabla + details.fig-tabla { margin-top: 6px; }
 
 /* ---------------------------------------------------------------- calculadora */
 .calculadora { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 32px; align-items: start; }
 .calc-entradas { position: sticky; top: 16px; }
 .perfil-caja { background: var(--niebla); border-radius: var(--radio); padding: 18px 20px; margin-top: 18px; display: grid; gap: 14px; border-top: 3px solid var(--pizarra); }
 .perfil-caja.b { margin-top: 0; border-top-style: dashed; }
-.perfil-caja h4 { font-size: 15px; font-weight: 600; }
+.perfil-caja h3 { font-size: 15px; font-weight: 600; }
 .perfil-caja select { min-width: 0; width: 100%; }
 .perfil-caja input[type="range"] { width: 100%; }
 .perfil-caja .rango output { min-width: 6.5ch; }
@@ -247,13 +258,6 @@ details.fig-tabla > div { overflow-x: auto; }
 .resumen-perfil td.v small { font-size: 13px; color: var(--tinta-3); font-weight: 400; }
 .resumen-perfil tbody td:first-child { font-size: 14px; color: var(--tinta-2); font-weight: 500; }
 .resumen-perfil th .mk { margin-right: 6px; vertical-align: middle; }
-.res-fila { display: grid; grid-template-columns: 116px repeat(5, minmax(0, 1fr)); align-items: stretch; }
-.res-fila + .res-fila { border-top: 1px solid var(--linea); }
-.res-fila > div { padding: 12px 14px; border-left: 1px solid var(--linea); }
-.res-fila > div:first-child { border-left: 0; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
-.res-fila.cabeza > div { padding-top: 9px; padding-bottom: 9px; background: var(--niebla); font-size: 12.5px; color: var(--tinta-3); font-weight: 500; }
-.res-v { font-size: 18.5px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.2; }
-.res-v small { display: block; white-space: nowrap; font-size: 12.5px; color: var(--tinta-3); font-weight: 400; margin-top: 2px; }
 .monto { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 24px; }
 .monto input[type="range"] { width: 260px; }
 .monto-r { margin: 0; font-size: 15px; }
@@ -294,7 +298,6 @@ details.fig-tabla > div { overflow-x: auto; }
   html { scroll-padding-top: 64px; }
   .portada-rejilla { grid-template-columns: minmax(0, 1fr); }
   .dos, .dos.amplio-izq, .dos.amplio-der { grid-template-columns: minmax(0, 1fr); }
-  .tres-tablas { grid-template-columns: minmax(0, 1fr); }
   .rejilla-modelos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .calculadora { grid-template-columns: minmax(0, 1fr); }
   .calc-entradas { position: static; }
@@ -307,11 +310,11 @@ details.fig-tabla > div { overflow-x: auto; }
   .barra-enlaces a { display: none; }
   .hallazgos-lista { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   .entrada { font-size: 17px; }
+  .ecuacion { font-size: 18px; }
+  .ecuacion .m { white-space: normal; }
   .rejilla-modelos, .rejilla-niveles, .rejilla-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rejilla-2, .rejilla-coef, .rejilla-razones { grid-template-columns: minmax(0, 1fr); }
   .lecturas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .res-fila { grid-template-columns: 84px repeat(5, minmax(0, 1fr)); }
-  .res-fila > div { padding: 10px 6px; }
   .resumen-perfil td.v { font-size: 16px; }
   .resumen-perfil th, .resumen-perfil td { padding: 9px 10px; }
   .ficha { grid-template-columns: minmax(0, 1fr); gap: 4px; }

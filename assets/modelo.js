@@ -113,7 +113,7 @@
     }
     return (lo + hi) / 2;
   }
-  // ----- d1 = E|Z0| (Infinity si no es finito)
+  // ----- d1 = E|U^(-1/2) Z|, momento absoluto de orden 1 de la SMN estándar (Infinity si no es finito)
   function d1(fam, par) {
     var nu = par && par.nu, tau = par && par.tau;
     if (fam === 'N') return Math.sqrt(2 / Math.PI);
@@ -140,8 +140,7 @@
       cuantil: function (p) {
         return p <= (1 + alpha) / 2 ? bajo * F0inv(fam, p / (1 + alpha), par) : sobre * F0inv(fam, 1 - (1 - p) / (1 - alpha), par);
       },
-      media: function () { var m = d1(fam, par); return isFinite(m) ? -2 * alpha * sigma * m : Infinity; },
-      pesoT: function (e) { var z = e / (e > 0 ? sobre : bajo); return (par.nu + 1) / (par.nu + z * z); }
+      media: function () { var m = d1(fam, par); return isFinite(m) ? -2 * alpha * sigma * m : Infinity; }
     };
     return o;
   }

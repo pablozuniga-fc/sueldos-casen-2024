@@ -13,19 +13,20 @@ Código de la tesis en R: https://github.com/pablozuniga-fc/regresion-dos-piezas
 2. Regresión normal de referencia: residuos estandarizados de la regresión por mínimos cuadrados.
 3. El modelo TP-SMN: densidad, propiedades, explorador interactivo de las cinco distribuciones y algoritmo ECME.
 4. Comparación de 20 modelos con escala común: BIC, residuos con la densidad ajustada y residuos cuantílicos.
-5. Escala por nivel educacional: diagnóstico por nivel, ajuste, gráficos cuantil-cuantil y cuantiles del sueldo.
+5. Escala por nivel educacional: diagnóstico por nivel, ajuste, origen de la mejora del ajuste, gráficos cuantil-cuantil y cuantiles del sueldo.
 6. Coeficientes e inferencia: estimaciones con tres errores estándar, escalas del error y diferencia entre moda y media.
-7. Sueldo según perfil: moda, mediana, media y rangos centrales del sueldo para un perfil elegido.
-8. Metodología y fuentes.
+7. Análisis de sensibilidad: sueldos como intervalos de redondeo, regresión por cuantiles, estimación ponderada, variantes del modelo y simulación.
+8. Sueldo según perfil: moda, mediana, media y rangos centrales del sueldo para un perfil elegido.
+9. Metodología y fuentes.
 
 ## Contenido
 
-- `index.html`: la página (sitio estático, sin compilación ni bibliotecas externas).
-- `assets/`: estilos, utilidades de gráficos, distribuciones TP-SMN y lógica de la página.
+- `index.html`: la página (sitio estático, sin compilación ni bibliotecas de JavaScript externas; la tipografía Fira Sans se carga desde Google Fonts).
+- `assets/`: estilos, utilidades de gráficos, distribuciones TP-SMN, lógica de la página, íconos y `portada.png`, la imagen que se muestra al compartir el enlace.
 - `datos/datos.json` y `datos/datos.js`: datos agregados y estimaciones de los modelos. No contienen registros individuales.
 
 ## Origen de las cifras
 
-Las tablas provienen de la corrida final en R de la tesis. Los histogramas, los residuos y los gráficos cuantil-cuantil se recalcularon con las estimaciones de R, y se comprobó que la log-verosimilitud de los modelos, los momentos y la distancia D de los residuos cuantílicos y los pesos por nivel coinciden con las tablas de R. Las curvas de densidad y la sección 7 aplican las fórmulas de la tesis en el navegador.
+Las tablas provienen de la corrida final en R de la tesis. Los histogramas, los residuos y los gráficos cuantil-cuantil se recalcularon con las estimaciones de R, y se comprobó que la log-verosimilitud de los modelos, los momentos y la distancia D de los residuos cuantílicos, los pesos por nivel, la barra más alta de los residuos y el aumento de la log-verosimilitud por nivel coinciden con las tablas de R. Las cifras del análisis de sensibilidad y de la simulación se toman de las tablas de R sin recalcular. Las curvas de densidad y la sección 8 aplican las fórmulas de la tesis en el navegador.
 
-Fuente de los datos: Base de datos Casen 2024, Ministerio de Desarrollo Social y Familia, publicada en el Banco Integrado de Datos con licencia CC BY 4.0.
+Fuente de los datos: Base de datos Casen 2024, Ministerio de Desarrollo Social y Familia, publicada en el Banco Integrado de Datos con licencia [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.es). Los datos se filtraron y resumieron para esta tesis (elaboración propia).

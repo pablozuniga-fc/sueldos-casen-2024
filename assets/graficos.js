@@ -15,8 +15,8 @@
     num: num,
     pesos: function (x) { return (x < 0 ? '−$' : '$') + num(Math.abs(Math.round(x)), 0); },
     pesosM: function (m) { return F.pesos(Math.round(m * 1e6 / 1000) * 1000); },       // millones → $ redondeado a mil
-    mil: function (m, d) { return '$' + num(m * 1000, d === undefined ? 1 : d) + ' mil'; },   // millones → miles
-    pct: function (x, d) { return num(x, d === undefined ? 1 : d) + ' %'; },
+    mil: function (m, d) { return (m < 0 ? '−$' : '$') + num(Math.abs(m) * 1000, d === undefined ? 1 : d) + '\u00a0mil'; },   // millones → miles
+    pct: function (x, d) { return num(x, d === undefined ? 1 : d) + '\u00a0%'; },
     millones: function (m, d) { return num(m, d === undefined ? 1 : d); }
   };
 
@@ -58,6 +58,10 @@
     var alto = typeof op.alto === 'function' ? op.alto(ancho) : (op.alto || 300);
     var svg = el('svg', { viewBox: '0 0 ' + ancho + ' ' + alto, width: ancho, height: alto, role: op.rol || 'img' }, cont);
     if (op.etiqueta) svg.setAttribute('aria-label', op.etiqueta);
+    else Promise.resolve().then(function () {            // después de dibujar: ya existe el título del panel
+      var fig = cont.closest('figure'), h = fig && fig.querySelector('h3'), tp = svg.querySelector('.titulo-panel');
+      if (h) svg.setAttribute('aria-label', h.textContent.trim() + (tp && tp.textContent ? ': ' + tp.textContent.trim() : ''));
+    });
     var g = el('g', { transform: 'translate(' + m.l + ',' + m.t + ')' }, svg);
     return { svg: svg, g: g, ancho: ancho, alto: alto, w: ancho - m.l - m.r, h: alto - m.t - m.b, m: m };
   }
@@ -142,7 +146,7 @@
     cont.innerHTML = items.map(function (it) {
       var mk;
       if (it.tipo === 'nada') mk = '';
-      else if (it.tipo === 'barra') mk = '<i class="mk" style="height:12px;width:16px;border:0;border-radius:2px;background:' + it.color + '"></i>';
+      else if (it.tipo === 'barra') mk = '<i class="mk" style="height:12px;width:16px;border:0;border-radius:2px;background:' + it.color + ';box-shadow:inset 0 0 0 1px rgba(38,44,51,.42)"></i>';
       else if (it.tipo === 'discontinua') mk = '<i class="mk" style="border-top:2.5px dashed ' + it.color + '"></i>';
       else if (it.tipo === 'punteada') mk = '<i class="mk" style="border-top:2px dotted ' + it.color + '"></i>';
       else if (it.tipo === 'punto') mk = '<i class="mk" style="width:10px;height:10px;border:0;border-radius:50%;background:' + it.color + '"></i>';
@@ -168,16 +172,38 @@
     for (var i = 0; i < n; i++) { var d = document.createElement('div'); d.className = 'panel-graf'; cont.appendChild(d); out.push(d); }
     return out;
   }
+  // Primer dibujo: los gráficos que están en pantalla o cerca se dibujan de inmediato; los demás, por turnos breves
+  // y en el orden de la página, para no bloquearla al cargar. Si la dirección trae un ancla o se pulsa un enlace
+  // interno, se dibuja todo lo pendiente de una vez, para que la página no cambie de alto durante el desplazamiento.
+  var cola = [], turnoPedido = false;
+  function turno() {
+    turnoPedido = false;
+    var t0 = Date.now();
+    while (cola.length && Date.now() - t0 < 12) cola.shift()();
+    if (cola.length) pedirTurno();
+  }
+  function pedirTurno() { if (!turnoPedido) { turnoPedido = true; setTimeout(turno, 0); } }
+  function vaciarCola() { while (cola.length) cola.shift()(); }
+  document.addEventListener('click', function (ev) {
+    var a = ev.target && ev.target.closest ? ev.target.closest('a[href^="#"]') : null;
+    if (a) vaciarCola();
+  }, true);
+  window.addEventListener('hashchange', vaciarCola);
+  window.addEventListener('beforeprint', vaciarCola);
+
   // redibuja al cambiar el ancho del contenedor
   function adaptable(cont, fn) {
-    var ultimo = 0, pend = false;
-    function ir() { pend = false; var w = Math.round(cont.clientWidth); if (w && w !== ultimo) { ultimo = w; fn(); } }
+    var ultimo = 0, pend = false, activo = false;
+    function ir() { pend = false; if (!activo) return; var w = Math.round(cont.clientWidth); if (w && w !== ultimo) { ultimo = w; fn(); } }
+    function activar() { if (!activo) { activo = true; ir(); } }
     if (window.ResizeObserver) new ResizeObserver(function () { if (!pend) { pend = true; requestAnimationFrame(ir); } }).observe(cont);
     else window.addEventListener('resize', ir);
-    ir();
-    return function () { ultimo = 0; ir(); };
+    if (location.hash.length > 1 || cont.getBoundingClientRect().top < window.innerHeight * 1.5) activar();
+    else { cola.push(activar); pedirTurno(); }
+    return function () { ultimo = 0; activar(); ir(); };
   }
 
   window.G = { F: F, el: el, texto: texto, escala: escala, ticks: ticks, lienzo: lienzo, ejeX: ejeX, ejeY: ejeY, linea: linea, area: area,
-    camino: camino, mostrar: mostrar, ocultar: ocultar, conTip: conTip, filas: filas, claves: claves, tabla: tabla, paneles: paneles, adaptable: adaptable };
+    camino: camino, mostrar: mostrar, ocultar: ocultar, conTip: conTip, filas: filas, claves: claves, tabla: tabla, paneles: paneles, adaptable: adaptable,
+    vaciarCola: vaciarCola };
 })();

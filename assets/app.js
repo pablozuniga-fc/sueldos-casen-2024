@@ -2,11 +2,14 @@
 (function () {
   'use strict';
   var D = window.DATOS, F = G.F, el = G.el, tx = G.texto;
-  var C = { nivel: '#db6e00', comun: '#3d78b8', mco: '#394049', obs: '#c3c9d1', obs2: '#7d8691', tinta: '#262c33', tinta2: '#4b5560', tinta3: '#6b7581',
-    linea: '#dde2e7', naranja: '#e77500', nivelClaro: '#f4c08a', comunClaro: '#a9c3e2' };
+  var C = { nivel: '#db6e00', comun: '#3d78b8', mco: '#394049', obs: '#c3c9d1', obs2: '#7d8691', tinta: '#262c33', tinta2: '#4b5560', tinta3: '#5d6671',
+    linea: '#dde2e7', borde: '#8a94a0', naranja: '#e77500', nivelClaro: '#f4c08a', comunClaro: '#a9c3e2' };
   var NIV = D.niveles, TAM = D.tamanos, N = D.meta.n;
-  var CORTO = { 'Básica o menos': 'Básica o menos', 'Media incompleta': 'Media incompleta', 'Media completa': 'Media completa', 'Superior incompleta': 'Superior incompleta',
-    'Técnico completo': 'Técnico completo', 'Profesional completo': 'Profesional completo', 'Postgrado completo': 'Postgrado completo' };
+  // letras griegas en la fuente matemática, para que ν no se confunda con v (HTML)
+  var GR = { alpha: '<span class="m">α</span>', nu: '<span class="m">ν</span>', tau: '<span class="m">τ</span>', sigma2: '<span class="m">σ<sup>2</sup></span>',
+    alphaE: '<span class="m"><span class="hat">α</span></span>', nuE: '<span class="m"><span class="hat">ν</span></span>', tauE: '<span class="m"><span class="hat">τ</span></span>',
+    sigma2E: '<span class="m"><span class="hat">σ</span><sup>2</sup></span>', sigmaE: '<span class="m"><span class="hat">σ</span></span>' };
+  var ESP = '\u00a0';                 // espacio que no se corta, entre una cifra y su unidad
   var FAM = { N: 'Normal', T: 't', SL: 'Slash', CN: 'Normal contaminada', L: 'Logística' };
   var ORDEN_FAM = ['N', 'T', 'SL', 'CN', 'L'];
   var MOD = { nivel: 'Escala por nivel', comun: 'Escala común' };
@@ -15,7 +18,7 @@
   function plot(fig) { return $(fig).querySelector('.fig-plot'); }
   function ley(fig) { return $(fig).querySelector('.fig-leyenda'); }
   function tablaFig(fig) { var d = $(fig).querySelector('details.fig-tabla > div'); return d; }
-  function suma(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return s; }
+  function columnas(cont) { return getComputedStyle(cont).gridTemplateColumns.split(' ').length; }
   function max(a) { return Math.max.apply(null, a); }
   function min(a) { return Math.min.apply(null, a); }
   function nombreModelo(m) { return m.tipo === 'TP' ? 'TP-' + (m.fam === 'T' ? '<i>t</i>' : FAM[m.fam]) : (m.fam === 'T' ? '<i>t</i>' : FAM[m.fam]); }
@@ -33,7 +36,9 @@
   }
 
   // ---------------------------------------------------------------- cifras en el texto
-  var VAL = { n: F.num(N), m10: F.pct(D.redondeo.m10), m50: F.pct(D.redondeo.m50), m100: F.pct(D.redondeo.m100), distintos: F.num(D.redondeo.distintos), fecha: D.meta.fecha };
+  var PV = D.modelos.filter(function (m) { return m.esp === 'B'; }).map(function (m) { return m.pct_ventana; });
+  var VAL = { n: F.num(N), m10: F.pct(D.redondeo.m10), m50: F.pct(D.redondeo.m50), m100: F.pct(D.redondeo.m100), distintos: F.num(D.redondeo.distintos), fecha: D.meta.fecha,
+    aj_min: F.pct(Math.min.apply(null, PV)), aj_max: F.pct(Math.max.apply(null, PV)), tot_c: F.pct(D.escala.comun.pct_ventana), tot_n: F.pct(D.escala.nivel.pct_ventana) };
   document.querySelectorAll('[data-v]').forEach(function (e) { var k = e.getAttribute('data-v'); if (VAL[k] !== undefined) e.textContent = VAL[k]; });
 
   // ---------------------------------------------------------------- índice con la sección activa
@@ -60,6 +65,14 @@
       if (b.v > 0) el('rect', Object.assign({ x: x0, y: y(b.v), width: w, height: Math.max(0, y(0) - y(b.v)), fill: b.color || color }, at || {}), g);
     });
     return g;
+  }
+  // contorno superior de un histograma: da a las barras claras un borde con contraste suficiente, sin oscurecerlas
+  function contorno(L, x, y, bs) {
+    if (!bs.length) return null;
+    var y0 = y(0).toFixed(1), d = 'M' + x(bs[0].a).toFixed(1) + ',' + y0;
+    bs.forEach(function (b) { var yv = y(b.v).toFixed(1); d += 'L' + x(b.a).toFixed(1) + ',' + yv + 'L' + x(b.b).toFixed(1) + ',' + yv; });
+    d += 'L' + x(bs[bs.length - 1].b).toFixed(1) + ',' + y0;
+    return el('path', { d: d, fill: 'none', stroke: C.borde, 'stroke-width': 0.8 }, L.g);
   }
   // agrega conteos de tramos de 10 mil (k/100, (k+1)/100] en tramos de ancho w (millones) anclados en cero
   function reagrupar(h, w, lo, hi) {
@@ -103,7 +116,6 @@
         return G.filas([['Más de ' + F.pesos(b.a * 1e6) + ' y hasta ' + F.pesos(b.b * 1e6)], ['Personas', F.num(b.c)], ['Porcentaje', F.pct(b.v)]]);
       });
     });
-    $('portada-nota').textContent = 'Los sueldos sobre el percentil 99 quedan fuera del gráfico.';
   })();
 
   // ================================================================= 1. DATOS
@@ -117,7 +129,7 @@
       fl.forEach(function (f, i) {
         var y0 = i * fila, ult = i === fl.length - 1;
         tx(L.g, 0, y0 + 13, f.paso + '  ' + f.criterio, { 'class': ult ? 'etq' : 'etq-2', 'font-weight': ult ? 600 : 400 });
-        var r = el('rect', { x: 0, y: y0 + 19, width: Math.max(1, x(f.n)), height: 13, rx: 2, fill: ult ? C.mco : C.obs }, L.g);
+        var r = el('rect', { x: 0, y: y0 + 19, width: Math.max(1, x(f.n)), height: 13, rx: 2, fill: ult ? C.mco : C.obs, stroke: ult ? null : C.borde, 'stroke-width': 0.8 }, L.g);
         tx(L.g, x(f.n) + 6, y0 + 30, F.num(f.n), { 'class': 'etq', 'font-weight': ult ? 600 : 400 });
         G.conTip(r, function () { return G.filas([[f.criterio], ['Personas', F.num(f.n)], f.excluidos !== null ? ['Excluidas', F.num(f.excluidos)] : null, f.sin_dato !== null ? ['Sin dato', F.num(f.sin_dato)] : null]); });
       });
@@ -146,7 +158,7 @@
       var x = G.escala(-0.025, 3.025, 0, L.w), y = G.escala(0, ym * 1.05, L.h, 0);
       G.ejeY(L, y, { formato: function (v) { return F.num(v) + ' %'; }, n: 4 });
       G.ejeX(L, x, { ticks: [0, 0.5, 1, 1.5, 2, 2.5, 3], formato: function (v) { return F.num(v, v % 1 ? 1 : 0); }, titulo: 'Millones de pesos' });
-      barras(L, x, y, A, '#9aa4b0');
+      barras(L, x, y, A, '#9aa4b0'); contorno(L, x, y, A);
       if (B) {
         var pts = []; B.forEach(function (q) { pts.push([q.a, q.v], [q.b, q.v]); });
         G.linea(L, pts, x, y, { stroke: C.tinta, 'stroke-width': 1.6 });
@@ -177,7 +189,7 @@
       fr.forEach(function (f, i) {
         var y0 = i * fila;
         tx(L.g, -10, y0 + 15, F.pesos(f.monto), { 'text-anchor': 'end', 'class': 'etq' });
-        var r = el('rect', { x: 0, y: y0 + 4, width: x(f.pct), height: 15, rx: 2, fill: i === 0 ? C.naranja : C.obs }, L.g);
+        var r = el('rect', { x: 0, y: y0 + 4, width: x(f.pct), height: 15, rx: 2, fill: i === 0 ? C.naranja : C.obs, stroke: i === 0 ? null : C.borde, 'stroke-width': 0.8 }, L.g);
         tx(L.g, x(f.pct) + 6, y0 + 16, F.pct(f.pct), { 'class': 'etq-2' });
         G.conTip(r, function () { return G.filas([[F.pesos(f.monto)], ['Personas', F.num(f.n)], ['Porcentaje', F.pct(f.pct)], ['Acumulado', F.pct(f.acum)]]); });
       });
@@ -193,11 +205,11 @@
     var ym = max(datos.map(function (d) { return max(d.map(function (p) { return Math.max(p.media, p.mediana); })); }));
     G.claves(ley('f-perfiles'), [{ tipo: 'linea', color: C.tinta, texto: 'Mediana' }, { tipo: 'discontinua', color: C.obs2, texto: 'Media' }]);
     G.adaptable(cont, function () {
-      var ps = G.paneles(cont, 3);
+      var ps = G.paneles(cont, 3), cols = columnas(cont);
       vars.forEach(function (v, k) {
-        var d = datos[k], L = G.lienzo(ps[k], { alto: function (w) { return Math.max(210, Math.min(300, w * 0.82)); }, m: { t: 26, r: 8, b: 38, l: k === 0 ? 40 : 30 } });
+        var izq = k % cols === 0, d = datos[k], L = G.lienzo(ps[k], { alto: function (w) { return Math.max(210, Math.min(300, w * 0.82)); }, m: { t: 26, r: 8, b: 38, l: izq ? 40 : 30 } });
         var x = G.escala(min(d.map(function (p) { return p.x; })), max(d.map(function (p) { return p.x; })), 0, L.w), y = G.escala(0, Math.ceil(ym * 2) / 2, L.h, 0);
-        G.ejeY(L, y, { n: 5, formato: function (t) { return k === 0 ? F.num(t, t % 1 ? 1 : 0) : ''; } });
+        G.ejeY(L, y, { n: 5, formato: function (t) { return izq ? F.num(t, t % 1 ? 1 : 0) : ''; } });
         G.ejeX(L, x, { n: 5, titulo: v[1], dec: 0 });
         tx(L.g, 0, -12, v[2], { 'class': 'titulo-panel' });
         tx(L.g, L.w, -12, 'ρ = ' + F.num(rho[v[2]], 3), { 'class': 'sub-panel', 'text-anchor': 'end' });
@@ -240,7 +252,7 @@
           tx(L.g, -10, yc + 4, k, { 'text-anchor': 'end', 'class': 'etq-2' });
           var g = el('g', null, L.g);
           el('line', { x1: x(c.p5), x2: x(c.p95), y1: yc, y2: yc, stroke: C.obs2, 'stroke-width': 1.3 }, g);
-          el('rect', { x: x(c.p25), y: yc - 8, width: Math.max(1.5, x(c.p75) - x(c.p25)), height: 16, fill: C.obs, stroke: '#9aa4b0', 'stroke-width': 1, rx: 2 }, g);
+          el('rect', { x: x(c.p25), y: yc - 8, width: Math.max(1.5, x(c.p75) - x(c.p25)), height: 16, fill: C.obs, stroke: C.borde, 'stroke-width': 1, rx: 2 }, g);
           el('line', { x1: x(c.mediana), x2: x(c.mediana), y1: yc - 8, y2: yc + 8, stroke: C.tinta, 'stroke-width': 2.2 }, g);
           el('rect', { x: x(c.media) - 4, y: yc - 4, width: 8, height: 8, fill: C.tinta, transform: 'rotate(45 ' + x(c.media) + ' ' + yc + ')' }, g);
           var hit = el('rect', { x: 0, y: y0, width: L.w, height: fila, 'class': 'zona-hover' }, g);
@@ -274,6 +286,7 @@
       var a = D.gvif.filter(function (g) { return g.esp === 'A' && g.termino === t; })[0], b = D.gvif.filter(function (g) { return g.esp === 'B' && g.termino === t; })[0];
       return [nom[t] || t, a ? F.num(a.aj, 3) : '', b ? F.num(b.aj, 3) : ''];
     }));
+    $('t-gvif').classList.add('pares');
   })();
 
   // ================================================================= 2. REGRESIÓN NORMAL
@@ -288,7 +301,7 @@
       var x = G.escala(-3, 8, 0, L.w), y = G.escala(0, Math.max(0.5, max(bs.map(function (b) { return b.v; })) * 1.05), L.h, 0);
       G.ejeY(L, y, { n: 4 }); G.ejeX(L, x, { ticks: [-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8], dec: 0, titulo: 'Residuo estandarizado' });
       tx(L.g, 0, -10, '(a) Histograma y densidad', { 'class': 'titulo-panel' });
-      barras(L, x, y, bs, C.obs);
+      barras(L, x, y, bs, C.obs); contorno(L, x, y, bs);
       var pts = []; for (var v = -3; v <= 8; v += 0.02) pts.push([v, M.normPdf(v)]);
       G.linea(L, pts, x, y, { stroke: C.mco, 'stroke-width': 1.8 });
       var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
@@ -308,61 +321,70 @@
       R.qq_v.forEach(function (v, k) { el('circle', { cx: x2(qx[k]).toFixed(1), cy: y2(v).toFixed(1), r: 1.7 }, g); });
     });
     $('mco-nota').textContent = 'Quedan fuera del histograma ' + R.izq + ' residuos menores que −3 y ' + R.der + ' mayores que 8. El gráfico Q-Q muestra los 500 residuos menores, los 500 mayores y uno de cada 50 del resto.';
+    G.tabla(tablaFig('f-mco'), ['Residuo estandarizado', 'Residuos', 'Porcentaje', 'Normal estándar'], R.c.map(function (c, i) {
+      return ['Más de ' + F.num(R.bordes[i], 1) + ' y hasta ' + F.num(R.bordes[i + 1], 1), F.num(c), F.pct(100 * c / nn, 2), F.pct(100 * (M.normCdf(R.bordes[i + 1]) - M.normCdf(R.bordes[i])), 2)];
+    }));
     var aj = D.mco.ajuste;
-    G.tabla($('t-mco'), ['', 'Especificación A', 'Especificación B'], [
-      ['Parámetros (con σ)', aj[0].p + 1, aj[1].p + 1], ['<i>R</i><sup>2</sup> ajustado', F.num(aj[0].r2, 3), F.num(aj[1].r2, 3)],
+    G.tabla($('t-mco'), ['Especificación', 'A', 'B'], [
+      ['Parámetros <i>m</i> (incluye ' + GR.sigma2 + ')', aj[0].p, aj[1].p], ['<i>R</i><sup>2</sup> ajustado', F.num(aj[0].r2, 3), F.num(aj[1].r2, 3)],
       ['Log-verosimilitud ℓ', F.num(aj[0].loglik, 2), F.num(aj[1].loglik, 2)], ['AIC', F.num(aj[0].aic, 2), F.num(aj[1].aic, 2)], ['BIC', F.num(aj[0].bic, 2), F.num(aj[1].bic, 2)],
-      ['σ̂ (millones de pesos)', F.num(aj[0].sigma, 4), F.num(aj[1].sigma, 4)], ['% de residuos sobre 3', F.num(aj[0].pct3, 2), F.num(aj[1].pct3, 2)]]);
+      [GR.sigmaE + ' (millones de pesos)', F.num(aj[0].sigma, 4), F.num(aj[1].sigma, 4)], ['% de residuos sobre 3', F.num(aj[0].pct3, 2), F.num(aj[1].pct3, 2)]]);
+    $('t-mco').classList.add('pares');
   })();
 
   // ================================================================= 3. EXPLORADOR TP-SMN
   (function () {
-    var cont = plot('f-explorador'), est = {}, st = { fam: 'T', alpha: -0.557, nu: 1.33, tau: 0.3 };
+    var cont = plot('f-explorador'), est = {}, st = { fam: 'T', alpha: 0, nu: 4, tau: 0.3 };
     D.modelos.forEach(function (m) { if (m.esp === 'B' && m.tipo === 'TP') est[m.fam] = m; });
-    var rangos = { T: [0.5, 30, 0.01, 'Grados de libertad ν'], SL: [0.3, 10, 0.01, 'Parámetro de colas ν'], CN: [0.01, 0.99, 0.005, 'Proporción ν'] };
+    var rangos = { T: [0.5, 30, 0.01, 'Grados de libertad ' + GR.nu], SL: [0.3, 10, 0.01, 'Parámetro ' + GR.nu], CN: [0.01, 0.99, 0.005, 'Proporción ' + GR.nu] };
     var aIn = $('ex-alpha'), nIn = $('ex-nu'), tIn = $('ex-tau');
     function ajustarControles() {
       var r = rangos[st.fam];
-      $('ex-nu-campo').hidden = !r; $('ex-tau-campo').hidden = st.fam !== 'CN';
-      if (r) { nIn.min = r[0]; nIn.max = r[1]; nIn.step = r[2]; $('ex-nu-rot').textContent = r[3]; st.nu = Math.min(r[1], Math.max(r[0], st.nu)); nIn.value = st.nu; }
+      $('ex-nu-campo').hidden = !r; $('ex-tau-campo').hidden = st.fam !== 'CN'; $('ex-fin').hidden = st.fam !== 'T';
+      if (r) { nIn.min = r[0]; nIn.max = r[1]; nIn.step = r[2]; $('ex-nu-rot').innerHTML = r[3]; st.nu = Math.min(r[1], Math.max(r[0], st.nu)); nIn.value = st.nu; }
       tIn.value = st.tau; aIn.value = st.alpha;
-      $('ex-est').disabled = false;
     }
+    // carga la estimación de la familia elegida (especificación B, escala común)
     function usarEstimacion() {
       var m = est[st.fam]; st.alpha = m.alpha;
       if (m.nu !== null) st.nu = m.nu;
       if (m.tau !== null) st.tau = m.tau;
       ajustarControles(); dibujar();
     }
-    segmento($('ex-fam'), 'exfam', ORDEN_FAM.map(function (f) { return { v: f, t: f === 'T' ? '<i>t</i>' : FAM[f] }; }), st.fam, function (v) {
-      st.fam = v; var m = est[v]; st.alpha = m.alpha; if (m.nu !== null) st.nu = m.nu; if (m.tau !== null) st.tau = m.tau; ajustarControles(); dibujar();
-    });
+    // carga la asimetría y los grados de libertad del modelo final (t de dos piezas con escala por nivel)
+    function usarFinal() { st.fam = 'T'; st.alpha = D.escala.nivel.alpha; st.nu = D.escala.nivel.nu; ajustarControles(); dibujar(); }
+    segmento($('ex-fam'), 'exfam', ORDEN_FAM.map(function (f) { return { v: f, t: f === 'T' ? '<i>t</i>' : FAM[f] }; }), st.fam, function (v) { st.fam = v; usarEstimacion(); });
     aIn.addEventListener('input', function () { st.alpha = +aIn.value; dibujar(); });
     nIn.addEventListener('input', function () { st.nu = +nIn.value; dibujar(); });
     tIn.addEventListener('input', function () { st.tau = +tIn.value; dibujar(); });
     $('ex-est').addEventListener('click', usarEstimacion);
+    $('ex-fin').addEventListener('click', usarFinal);
     function par() { return { nu: st.nu, tau: st.tau }; }
     function dibujar() {
-      $('ex-alpha-o').textContent = F.num(st.alpha, 3); $('ex-nu-o').textContent = F.num(st.nu, st.fam === 'CN' ? 3 : 2); $('ex-tau-o').textContent = F.num(st.tau, 3);
+      if (!iniciado) return;
+      $('ex-alpha-o').textContent = F.num(st.alpha, 3); $('ex-nu-o').textContent = F.num(st.nu, 3); $('ex-tau-o').textContent = F.num(st.tau, 3);
       cont.innerHTML = '';
       var T = M.tp(st.fam, 1, st.alpha, par()), S = M.tp(st.fam, 1, 0, par());
       var L = G.lienzo(cont, { alto: function (w) { return Math.max(240, Math.min(330, w * 0.56)); }, m: { t: 24, r: 10, b: 38, l: 40 } });
       var xa = -6, xb = 10, x = G.escala(xa, xb, 0, L.w), pts = [], ptsS = [], ym = 0;
       for (var i = 0; i <= 400; i++) { var v = xa + (xb - xa) * i / 400, d = T.dens(v), ds = S.dens(v); pts.push([v, d]); ptsS.push([v, ds]); ym = Math.max(ym, d, ds); }
       var y = G.escala(0, ym * 1.1, L.h, 0);
-      G.ejeY(L, y, { n: 4 }); G.ejeX(L, x, { ticks: [-6, -4, -2, 0, 2, 4, 6, 8, 10], dec: 0, titulo: 'Error estándar (σ = 1)' });
+      G.ejeY(L, y, { n: 4 }); G.ejeX(L, x, { ticks: [-6, -4, -2, 0, 2, 4, 6, 8, 10], dec: 0, titulo: 'Valor del error (σ = 1)' });
       var izq = pts.filter(function (p) { return p[0] <= 0; }), der = pts.filter(function (p) { return p[0] >= 0; });
       G.area(L, izq.concat([[0, T.dens(0)]]), x, y, 0, { fill: C.mco, 'fill-opacity': 0.14 });
       G.area(L, [[0, T.dens(0)]].concat(der), x, y, 0, { fill: C.naranja, 'fill-opacity': 0.2 });
       G.linea(L, ptsS, x, y, { stroke: C.obs2, 'stroke-width': 1.6, 'stroke-dasharray': '5 4' });
       G.linea(L, pts, x, y, { stroke: C.tinta, 'stroke-width': 2.2 });
       el('line', { x1: x(0), x2: x(0), y1: y(T.dens(0)), y2: L.h, stroke: C.tinta, 'stroke-width': 1 }, L.g);
-      var pb = (1 + st.alpha) / 2;
-      tx(L.g, x(0) - 8, 4, F.pct(100 * pb) + ' bajo la moda', { 'text-anchor': 'end', 'class': 'etq', 'font-weight': 600 });
-      tx(L.g, x(0) + 8, 4, F.pct(100 * (1 - pb)) + ' sobre la moda', { 'class': 'etq', 'font-weight': 600 });
+      // los dos porcentajes se redondean de modo que sumen 100
+      var pb = Math.round(1000 * (1 + st.alpha) / 2) / 10;
+      tx(L.g, x(0) - 8, 4, F.pct(pb) + ' bajo la moda', { 'text-anchor': 'end', 'class': 'etq', 'font-weight': 600 });
+      tx(L.g, x(0) + 8, 4, F.pct(100 - pb) + ' sobre la moda', { 'class': 'etq', 'font-weight': 600 });
       var med = T.cuantil(0.5), media = T.media(), varf = M.varFinita(st.fam, par());
-      var l = [['Proporción bajo la moda', F.pct(100 * pb)], ['Escala bajo / sobre la moda', F.num(1 + st.alpha, 3) + ' / ' + F.num(1 - st.alpha, 3)],
-        ['Mediana del error', F.num(med, 3)], ['Media del error', isFinite(media) ? F.num(media, 3) + '<small>' + (varf ? 'varianza finita' : 'varianza infinita') + '</small>' : 'No existe<small>ni la varianza</small>']];
+      var fuera = function (v) { return v < xa || v > xb ? '; fuera del gráfico' : ''; };
+      var l = [['Proporción bajo la moda', F.pct(pb)], ['Escala bajo / sobre la moda', F.num(1 + st.alpha, 3) + ' / ' + F.num(1 - st.alpha, 3)],
+        ['Mediana del error', F.num(med, 3) + (fuera(med) ? '<small>' + fuera(med).slice(2) + '</small>' : '')],
+        ['Media del error', isFinite(media) ? F.num(media, 3) + '<small>' + (varf ? 'varianza finita' : 'varianza infinita') + fuera(media) + '</small>' : 'No existe<small>ni la varianza</small>']];
       $('ex-lecturas').innerHTML = l.map(function (q) { return '<div class="lectura">' + q[0] + '<b>' + q[1] + '</b></div>'; }).join('');
       var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
       G.conTip(hov, function (ev) {
@@ -370,7 +392,9 @@
         return G.filas([['Error = ' + F.num(xv, 2)], ['Densidad de dos piezas', F.num(T.dens(xv), 4)], ['Densidad simétrica', F.num(S.dens(xv), 4)], ['P(error ≤ valor)', F.pct(100 * T.cdf(xv))]]);
       });
     }
-    ajustarControles();
+    var iniciado = false;
+    usarEstimacion();                                  // parte en la estimación de la t de dos piezas, sin redondear
+    iniciado = true;
     G.adaptable(cont, dibujar);
   })();
 
@@ -387,7 +411,7 @@
     G.adaptable(cont, function () {
       var ps = G.paneles(cont, 2); cont.className = 'fig-plot rejilla-2';
       ['A', 'B'].forEach(function (esp, k) {
-        var fila = 34, L = G.lienzo(ps[k], { alto: 5 * fila + 66, m: { t: 26, r: 14, b: 40, l: k === 0 || ps[0].offsetTop !== ps[1].offsetTop ? 128 : 128 } });
+        var fila = 34, L = G.lienzo(ps[k], { alto: 5 * fila + 66, m: { t: 26, r: 14, b: 40, l: 128 } });
         var x = G.escala(20000, 100000, 0, L.w);
         G.ejeX(L, x, { ticks: [20000, 40000, 60000, 80000, 100000], formato: function (v) { return F.num(v / 1000) + ' mil'; }, rejilla: true, titulo: 'BIC' });
         tx(L.g, -L.m.l, -10, esp === 'A' ? 'Especificación A: años de escolaridad' : 'Especificación B: nivel educacional', { 'class': 'titulo-panel' });
@@ -415,7 +439,7 @@
     function dibujar() {
       var ms = D.modelos.filter(function (m) { return m.esp === esp; });
       ms.sort(function (a, b) { return a.bic - b.bic; });
-      G.tabla($('t-modelos'), ['Modelo', 'm', 'ℓ', 'AIC', 'BIC', 'σ̂²', 'α̂', 'ν̂', 'τ̂', 'Iteraciones'], ms.map(function (m) {
+      G.tabla($('t-modelos'), ['Modelo', '<i>m</i>', 'ℓ', 'AIC', 'BIC', GR.sigma2E, GR.alphaE, GR.nuE, GR.tauE, 'Iteraciones'], ms.map(function (m) {
         return [nombreModelo(m), m.m, F.num(m.loglik, 2), F.num(m.aic, 2), F.num(m.bic, 2), F.num(m.sigma2, 5), m.tipo === 'TP' ? F.num(m.alpha, 3) : '0', m.nu === null ? '' : F.num(m.nu, 3), m.tau === null ? '' : F.num(m.tau, 3), m.iter];
       }), { clase: function (k) { return ms[k].sel ? 'destacada' : ''; } });
     }
@@ -426,25 +450,23 @@
   // ---- residuos y densidad (10 paneles)
   (function () {
     var cont = plot('f-ajuste'), ancho = 0.05, ms = ordenB();
-    var pv = ms.map(function (m) { return m.pct_ventana; });
-    $('aj-pct').textContent = 'entre el ' + F.pct(min(pv)) + ' y el ' + F.pct(max(pv));
     G.claves(ley('f-ajuste'), [{ tipo: 'barra', color: C.obs, texto: 'Residuos' }, { tipo: 'linea', color: C.mco, texto: 'Densidad ajustada del error' }, { tipo: 'linea', color: C.comun, texto: 'TP-<i>t</i>: menor BIC' }]);
     segmento($('aj-ancho'), 'ajancho', [{ v: 0.02, t: '$20.000' }, { v: 0.05, t: '$50.000' }, { v: 0.1, t: '$100.000' }], ancho, function (v) { ancho = v; dibujar(); });
     function dibujar() {
-      var ps = G.paneles(cont, 10), datos = ms.map(function (m) {
+      var ps = G.paneles(cont, 10), cols = columnas(cont), datos = ms.map(function (m) {
         var bs = reagrupar(m.res, ancho, -1, 2).map(function (b) { b.v = b.c / (N * ancho); return b; });
         var T = modeloTP(m), pts = []; for (var i = 0; i <= 300; i++) { var v = -1 + 3 * i / 300; pts.push([v, T.dens(v)]); }
         return { m: m, bs: bs, pts: pts, T: T };
       });
       var ym = max(datos.map(function (d) { return Math.max(max(d.bs.map(function (b) { return b.v; })), max(d.pts.map(function (p) { return p[1]; }))); }));
       datos.forEach(function (d, k) {
-        var izq = k % 5 === 0, L = G.lienzo(ps[k], { alto: function (w) { return Math.max(150, Math.min(220, w * 0.95)); }, m: { t: 22, r: 4, b: 30, l: izq ? 30 : 10 } });
+        var izq = k % cols === 0, L = G.lienzo(ps[k], { alto: function (w) { return Math.max(150, Math.min(220, w * 0.95)); }, m: { t: 22, r: 4, b: 30, l: izq ? 30 : 10 } });
         var x = G.escala(-1, 2, 0, L.w), y = G.escala(0, ym * 1.04, L.h, 0);
         G.ejeY(L, y, { ticks: [0, 1, 2, 3, 4].filter(function (t) { return t <= ym * 1.04; }), formato: function (t) { return izq ? F.num(t) : ''; } });
         G.ejeX(L, x, { ticks: [-1, 0, 1, 2], dec: 0 });
         var col = d.m.sel ? C.comun : C.mco;
         tx(L.g, 0, -8, '', { 'class': 'titulo-panel' }).innerHTML = (d.m.tipo === 'TP' ? 'TP-' : '') + (d.m.fam === 'T' ? '<tspan font-style="italic">t</tspan>' : FAM[d.m.fam]);
-        barras(L, x, y, d.bs, C.obs);
+        barras(L, x, y, d.bs, C.obs); contorno(L, x, y, d.bs);
         el('line', { x1: x(0), x2: x(0), y1: 0, y2: L.h, stroke: C.tinta3, 'stroke-dasharray': '3 3', 'stroke-width': 1 }, L.g);
         G.linea(L, d.pts, x, y, { stroke: col, 'stroke-width': d.m.sel ? 2.4 : 1.7 });
         var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
@@ -456,6 +478,13 @@
       });
     }
     G.adaptable(cont, dibujar);
+    // barra más alta con barras de $50.000 (tabla de R) y densidad ajustada en la moda
+    function filaPico(nombre, p) {
+      return [nombre, 'Más de ' + F.pesos(p.desde * 1e6) + ' y hasta ' + F.pesos(p.hasta * 1e6), F.num(p.altura, 3), F.num(p.esperada, 3), F.num(p.dens_moda, 3), F.num(p.pct500, 1)];
+    }
+    G.tabla(tablaFig('f-ajuste'), ['Modelo', 'Barra más alta (residuos)', 'Altura', 'Altura esperada', 'Densidad en la moda', '% con $500.000'],
+      ms.map(function (m) { return filaPico(nombreModelo(m), m.pico); }).concat([filaPico('TP-<i>t</i> con escala por nivel', D.escala.nivel.pico)]),
+      { txt: [1], clase: function (k) { return k < ms.length && ms[k].sel ? 'destacada' : ''; } });
   })();
 
   // ---- Q-Q de residuos cuantílicos (10 paneles)
@@ -463,9 +492,9 @@
     var cont = plot('f-qq'), ms = ordenB(), xt = D.qq_teorico;
     var ya = min(ms.map(function (m) { return min(m.qq); })), yb = max(ms.map(function (m) { return max(m.qq); }));
     G.adaptable(cont, function () {
-      var ps = G.paneles(cont, 10);
+      var ps = G.paneles(cont, 10), cols = columnas(cont);
       ms.forEach(function (m, k) {
-        var izq = k % 5 === 0, L = G.lienzo(ps[k], { alto: function (w) { return Math.max(150, Math.min(220, w * 0.95)); }, m: { t: 22, r: 4, b: 30, l: izq ? 30 : 10 } });
+        var izq = k % cols === 0, L = G.lienzo(ps[k], { alto: function (w) { return Math.max(150, Math.min(220, w * 0.95)); }, m: { t: 22, r: 4, b: 30, l: izq ? 30 : 10 } });
         var x = G.escala(-3.3, 3.3, 0, L.w), y = G.escala(Math.floor(ya), Math.ceil(yb), L.h, 0);
         G.ejeY(L, y, { ticks: G.ticks(Math.floor(ya), Math.ceil(yb), 4), formato: function (t) { return izq ? F.num(t) : ''; } });
         G.ejeX(L, x, { ticks: [-3, 0, 3], dec: 0 });
@@ -549,9 +578,10 @@
   (function () {
     var c = E.comparacion;
     G.tabla($('t-escala'), ['', 'Escala común', 'Escala por nivel'], [
-      ['Parámetros m', c[0].m, c[1].m], ['Log-verosimilitud ℓ', F.num(c[0].loglik, 2), F.num(c[1].loglik, 2)], ['AIC', F.num(c[0].aic, 2), F.num(c[1].aic, 2)],
-      ['BIC', F.num(c[0].bic, 2), F.num(c[1].bic, 2)], ['Diferencia de BIC', '', F.num(c[1].dbic, 2)], ['α̂', F.num(c[0].alpha, 3), F.num(c[1].alpha, 3)],
-      ['ν̂', F.num(c[0].nu, 3), F.num(c[1].nu, 3)], ['Iteraciones', c[0].iter, c[1].iter]]);
+      ['Parámetros <i>m</i>', c[0].m, c[1].m], ['Log-verosimilitud ℓ', F.num(c[0].loglik, 2), F.num(c[1].loglik, 2)], ['AIC', F.num(c[0].aic, 2), F.num(c[1].aic, 2)],
+      ['BIC', F.num(c[0].bic, 2), F.num(c[1].bic, 2)], ['Diferencia de BIC', '', F.num(c[1].dbic, 2)], [GR.alphaE, F.num(c[0].alpha, 3), F.num(c[1].alpha, 3)],
+      [GR.nuE, F.num(c[0].nu, 3), F.num(c[1].nu, 3)], ['Iteraciones', c[0].iter, c[1].iter]]);
+    $('t-escala').classList.add('pares');
   })();
 
   // ---- residuos totales y densidad (2 paneles)
@@ -574,7 +604,7 @@
         var x = G.escala(lo, hi, 0, L.w), y = G.escala(0, ym * 1.05, L.h, 0);
         G.ejeY(L, y, { n: 4 }); G.ejeX(L, x, { n: 5, titulo: 'Residuo (millones de pesos)' });
         tx(L.g, 0, -8, MOD[d.mod], { 'class': 'titulo-panel' });
-        barras(L, x, y, d.bs, C.obs);
+        barras(L, x, y, d.bs, C.obs); contorno(L, x, y, d.bs);
         el('line', { x1: x(0), x2: x(0), y1: 0, y2: L.h, stroke: C.tinta3, 'stroke-dasharray': '3 3' }, L.g);
         G.linea(L, d.pts, x, y, { stroke: C[d.mod], 'stroke-width': 2.2 });
         var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
@@ -585,6 +615,33 @@
         });
       });
     });
+  })();
+
+  // ---- aumento de la log-verosimilitud con escala por nivel, según nivel y sueldo declarado
+  (function () {
+    var cont = plot('f-ganancia'), Gn = E.ganancia, vals = [];
+    Gn.forEach(function (r) { vals.push(r.g500, r.g_otro); });
+    function nombre(r) { return r.nivel === 'Total' ? 'Todos los niveles' : r.nivel; }
+    G.claves(ley('f-ganancia'), [{ tipo: 'barra', color: C.naranja, texto: 'Personas que declaran $500.000' }, { tipo: 'barra', color: C.obs2, texto: 'Personas con otro sueldo' }]);
+    G.adaptable(cont, function () {
+      cont.innerHTML = '';
+      var fila = 38, ml = cont.clientWidth < 460 ? 118 : 138, L = G.lienzo(cont, { alto: Gn.length * fila + 46, m: { t: 6, r: 16, b: 40, l: ml } });
+      var x = G.escala(Math.floor(min(vals) / 500) * 500, Math.ceil(max(vals) * 1.12 / 500) * 500, 0, L.w);
+      G.ejeX(L, x, { n: Math.max(3, Math.round(L.w / 100)), dec: 0, rejilla: true, titulo: 'Aumento de la log-verosimilitud' });
+      el('line', { x1: x(0), x2: x(0), y1: 0, y2: L.h, stroke: C.tinta3 }, L.g);
+      Gn.forEach(function (r, i) {
+        var yc = i * fila + fila / 2, total = r.nivel === 'Total';
+        if (total) el('line', { x1: -ml, x2: L.w, y1: i * fila, y2: i * fila, stroke: C.linea }, L.g);
+        tx(L.g, -10, yc + 4, nombre(r), { 'text-anchor': 'end', 'class': 'etq-2', 'font-weight': total ? 600 : null });
+        [[r.g500, r.n500, r.p500, C.naranja, 'personas que declaran $500.000', -13], [r.g_otro, r.n_otro, r.p_otro, C.obs2, 'personas con otro sueldo', 1]].forEach(function (q) {
+          var v = q[0], b = el('rect', { x: Math.min(x(0), x(v)), y: yc + q[5], width: Math.max(0.5, Math.abs(x(v) - x(0))), height: 12, fill: q[3], rx: 1 }, L.g);
+          tx(L.g, Math.max(x(v), x(0)) + 5, yc + q[5] + 10, F.num(v, 1), { 'class': 'etq-2' });
+          G.conTip(b, function () { return G.filas([[nombre(r) + ': ' + q[4]], ['Personas', F.num(q[1])], ['Aumento', F.num(v, 1)], ['% del aumento total', F.pct(q[2])]]); });
+        });
+      });
+    });
+    G.tabla(tablaFig('f-ganancia'), ['Nivel', '$500.000: personas', '$500.000: aumento', 'Otro sueldo: personas', 'Otro sueldo: aumento', 'Todos: aumento', '% del total'],
+      Gn.map(function (r) { return [nombre(r), F.num(r.n500), F.num(r.g500, 1), F.num(r.n_otro), F.num(r.g_otro, 1), F.num(r.g, 1), F.num(r.p, 1)]; }));
   })();
 
   // ---- Q-Q por nivel (8 paneles)
@@ -631,13 +688,16 @@
         var bs = reagrupar(h, ancho, lo, hi).map(function (b) { b.v = b.c / (NJ[j] * ancho); return b; });
         var T = errorNivel(mod, j), pts = []; for (var i = 0; i <= 240; i++) { var v = lo + rango * i / 240; pts.push([v, T.dens(v)]); }
         pts.push([0, T.dens(0)]); pts.sort(function (a, b) { return a[0] - b[0]; });
-        var ym = Math.max(max(bs.map(function (b) { return b.v; })), T.dens(0));
+        // el eje vertical cubre las barras y la densidad de los dos modelos, para que no cambie al elegir el otro
+        var ym = max(['comun', 'nivel'].map(function (mm) {
+          return Math.max(max(reagrupar(E[mm].hist_nivel[j], ancho, lo, hi).map(function (b) { return b.c / (NJ[j] * ancho); })), errorNivel(mm, j).dens(0));
+        }));
         var L = G.lienzo(ps[j], { alto: function (w) { return Math.max(160, Math.min(230, w * 0.82)); }, m: { t: 34, r: 6, b: 30, l: 30 } });
         var x = G.escala(lo, hi, 0, L.w), y = G.escala(0, ym * 1.05, L.h, 0);
         G.ejeY(L, y, { n: 3 }); G.ejeX(L, x, { n: 4 });
         tx(L.g, -L.m.l + 2, -20, nv, { 'class': 'titulo-panel' });
         tx(L.g, -L.m.l + 2, -6, 'Barras de ' + F.pesos(ancho * 1e6), { 'class': 'sub-panel' });
-        barras(L, x, y, bs, C.obs);
+        barras(L, x, y, bs, C.obs); contorno(L, x, y, bs);
         el('line', { x1: x(0), x2: x(0), y1: 0, y2: L.h, stroke: C.tinta3, 'stroke-dasharray': '3 3' }, L.g);
         G.linea(L, pts, x, y, { stroke: C[mod], 'stroke-width': 2.2 });
         var hov = el('rect', { x: 0, y: 0, width: L.w, height: L.h, 'class': 'zona-hover' }, L.g);
@@ -694,6 +754,20 @@
       }));
   })();
 
+  // ---- colas de los residuos cuantílicos por nivel, y residuos por sexo y tamaño de empresa
+  (function () {
+    var R = E.residuos_nivel, Gr = E.residuos_grupos;
+    G.tabla($('t-colas'), ['Nivel', 'Común: % <i>q</i> &lt; −2', 'Común: % <i>q</i> &gt; 2', 'Por nivel: % <i>q</i> &lt; −2', 'Por nivel: % <i>q</i> &gt; 2'], NIVT.map(function (nv, i) {
+      var a = R.comun[i], b = R.nivel[i];
+      return [nv === 'Total' ? 'Todos los niveles' : nv, F.num(a.bajo2, 2), F.num(a.sobre2, 2), F.num(b.bajo2, 2), F.num(b.sobre2, 2)];
+    }));
+    G.tabla($('t-grupos'), ['Grupo', 'Personas', 'Común: media', 'Común: DE', 'Común: % |<i>q</i>| &gt; 2', 'Común: <i>D</i>', 'Por nivel: media', 'Por nivel: DE', 'Por nivel: % |<i>q</i>| &gt; 2', 'Por nivel: <i>D</i>'],
+      Gr.comun.map(function (a, i) {
+        var b = Gr.nivel[i];
+        return [a.categoria, F.num(a.n), F.num(a.media, 3), F.num(a.de, 3), F.num(a.p2, 2), F.num(a.D, 3), F.num(b.media, 3), F.num(b.de, 3), F.num(b.p2, 2), F.num(b.D, 3)];
+      }));
+  })();
+
   // ================================================================= 6. INFERENCIA
   var INF = {}; D.inferencia.forEach(function (r) { (INF[r.modelo] = INF[r.modelo] || {})[r.par] = r; });
   var MCO = {}; D.mco.coef.forEach(function (r) { if (r.esp === 'B') MCO[r.par] = r; });
@@ -729,7 +803,7 @@
             var c = el('circle', { cx: x(r.est * 1000), cy: yy, r: 4.6, fill: m === 'comun' ? '#fff' : col, stroke: col, 'stroke-width': 2 }, L.g);
             G.conTip(c, function () {
               var f = function (v) { return F.pesos(v * 1e6); };
-              return G.filas([[b[1] + ', ' + MOD[m].toLowerCase()], ['Estimación', f(r.est)], ['Intervalo de 95 %', f(r.ic_inf) + ' a ' + f(r.ic_sup)], ['EE<sub>C</sub>', f(r.ee_c)]]);
+              return G.filas([[b[1] + ', ' + MOD[m].toLowerCase()], ['Estimación', f(r.est)], ['Intervalo de 95' + ESP + '%', f(r.ic_inf) + ' a ' + f(r.ic_sup)], ['EE<sub>C</sub>', f(r.ee_c)]]);
             });
           });
         });
@@ -751,13 +825,13 @@
       });
       filasT.push(['Parámetros del error', '', '', '', '', '']); clases.push('grupo');
       var s0 = INF.comun.sigma2;
-      filasT.push(['σ² (común)', '', F.num(s0.est, 5) + ' (' + F.num(s0[ee], 5) + ')', F.num(s0.ic_inf, 5) + ' a ' + F.num(s0.ic_sup, 5), '', '']); clases.push('');
-      NIV.forEach(function (nv) { var r = INF.nivel['sigma2 [' + nv + ']']; filasT.push(['σ²: ' + nv.toLowerCase(), '', '', '', F.num(r.est, 5) + ' (' + F.num(r[ee], 5) + ')', F.num(r.ic_inf, 5) + ' a ' + F.num(r.ic_sup, 5)]); clases.push(''); });
+      filasT.push([GR.sigma2 + ' (común)', '', F.num(s0.est, 5) + ' (' + F.num(s0[ee], 5) + ')', F.num(s0.ic_inf, 5) + ' a ' + F.num(s0.ic_sup, 5), '', '']); clases.push('');
+      NIV.forEach(function (nv) { var r = INF.nivel['sigma2 [' + nv + ']']; filasT.push([GR.sigma2 + ': ' + nv.toLowerCase(), '', '', '', F.num(r.est, 5) + ' (' + F.num(r[ee], 5) + ')', F.num(r.ic_inf, 5) + ' a ' + F.num(r.ic_sup, 5)]); clases.push(''); });
       ['alpha', 'nu'].forEach(function (p) {
         var a = INF.comun[p], c = INF.nivel[p];
-        filasT.push([p === 'alpha' ? 'α' : 'ν', '', F.num(a.est, 3) + ' (' + F.num(a[ee], 3) + ')', F.num(a.ic_inf, 3) + ' a ' + F.num(a.ic_sup, 3), F.num(c.est, 3) + ' (' + F.num(c[ee], 3) + ')', F.num(c.ic_inf, 3) + ' a ' + F.num(c.ic_sup, 3)]); clases.push('');
+        filasT.push([p === 'alpha' ? GR.alpha : GR.nu, '', F.num(a.est, 3) + ' (' + F.num(a[ee], 3) + ')', F.num(a.ic_inf, 3) + ' a ' + F.num(a.ic_sup, 3), F.num(c.est, 3) + ' (' + F.num(c[ee], 3) + ')', F.num(c.ic_inf, 3) + ' a ' + F.num(c.ic_sup, 3)]); clases.push('');
       });
-      G.tabla($('t-coef'), ['Parámetro', 'Regresión normal', 'Escala común (' + NOM[ee] + ')', 'Intervalo de 95 %', 'Escala por nivel (' + NOM[ee] + ')', 'Intervalo de 95 %'], filasT, { clase: function (k) { return clases[k]; } });
+      G.tabla($('t-coef'), ['Parámetro', 'Regresión normal', 'Escala común (' + NOM[ee] + ')', 'Intervalo de 95' + ESP + '%', 'Escala por nivel (' + NOM[ee] + ')', 'Intervalo de 95' + ESP + '%'], filasT, { clase: function (k) { return clases[k]; } });
     }
     segmento($('tc-ee'), 'tcee', [{ v: 'ee_c', t: 'Sándwich por conglomerado' }, { v: 'ee_s', t: 'Sándwich individual' }, { v: 'ee_i', t: 'Información observada' }], ee, function (v) { ee = v; dibujar(); });
     dibujar();
@@ -779,7 +853,8 @@
         el('line', { x1: x(1), x2: x(1), y1: 0, y2: L.h, stroke: C.tinta3, 'stroke-dasharray': '4 3' }, L.g);
         pars.forEach(function (p, i) {
           var yc = i * fila + fila / 2;
-          if (ml > 20) tx(L.g, -10, yc + 4, p[1].replace(' (por año)', '').replace(' (por hora)', ''), { 'text-anchor': 'end', 'class': 'etq-2' });
+          if (ml > 20) tx(L.g, -10, yc + 4, p[1].replace(' (por año)', '').replace(' (por hora)', ''), { 'text-anchor': 'end', 'class': 'etq-2',
+            style: p[0] === 'alpha' || p[0] === 'nu' ? 'font-family:"STIX Two Text",Cambria,"Latin Modern Roman","Times New Roman",serif;font-style:italic;font-size:14px' : null });
           el('line', { x1: 0, x2: L.w, y1: yc, y2: yc, stroke: '#f0f2f4' }, L.g);
           ['comun', 'nivel'].forEach(function (m) {
             var r = INF[m][p[0]], c = el('circle', { cx: x(r[rz[0]]), cy: yc, r: 4.4, fill: m === 'comun' ? '#fff' : C[m], stroke: C[m], 'stroke-width': 2 }, L.g);
@@ -788,17 +863,23 @@
         });
       });
     });
+    // tabla: también los parámetros de escala, que el gráfico no muestra
+    var todosPar = BETAS.concat([['sigma2', GR.sigma2 + ' (escala común)']], NIV.map(function (nv) { return ['sigma2 [' + nv + ']', GR.sigma2 + ': ' + nv.toLowerCase()]; }), [['alpha', GR.alpha], ['nu', GR.nu]]);
+    function rz(m, k, c) { return INF[m][k] ? F.num(INF[m][k][c], 2) : ''; }
+    G.tabla(tablaFig('f-razones'), ['Parámetro', 'Común: EE<sub>S</sub>/EE<sub>I</sub>', 'Común: EE<sub>C</sub>/EE<sub>S</sub>', 'Por nivel: EE<sub>S</sub>/EE<sub>I</sub>', 'Por nivel: EE<sub>C</sub>/EE<sub>S</sub>'],
+      todosPar.map(function (p) { return [p[1], rz('comun', p[0], 'r1'), rz('comun', p[0], 'r2'), rz('nivel', p[0], 'r1'), rz('nivel', p[0], 'r2')]; }));
   })();
 
   // ---- escalas por nivel con intervalos
   (function () {
     var cont = plot('f-escalas'), T = E.nivel_tab, c0 = T.comun[0];
+    var xmax = Math.ceil(max(T.nivel.map(function (r) { return (r.sobre + 1.96 * r.ee_sobre) * 1000; })) * 1.02 / 50) * 50;
     G.claves(ley('f-escalas'), [{ tipo: 'hueco', color: C.nivel, texto: 'Bajo la moda' }, { tipo: 'punto', color: C.nivel, texto: 'Sobre la moda' }, { tipo: 'discontinua', color: C.comun, texto: 'Escalas del modelo con escala común' }]);
     G.adaptable(cont, function () {
       cont.innerHTML = '';
       var fila = 36, ml = cont.clientWidth < 460 ? 118 : 138, L = G.lienzo(cont, { alto: NIV.length * fila + 44, m: { t: 8, r: 14, b: 38, l: ml } });
-      var x = G.escala(0, 1300, 0, L.w);
-      G.ejeX(L, x, { ticks: [0, 250, 500, 750, 1000, 1250], dec: 0, rejilla: true, titulo: 'Miles de pesos' });
+      var x = G.escala(0, xmax, 0, L.w);
+      G.ejeX(L, x, { ticks: G.ticks(0, xmax, 5), dec: 0, rejilla: true, titulo: 'Miles de pesos' });
       [c0.bajo, c0.sobre].forEach(function (v) { el('line', { x1: x(v * 1000), x2: x(v * 1000), y1: 0, y2: L.h, stroke: C.comun, 'stroke-dasharray': '5 3', 'stroke-width': 1.4 }, L.g); });
       T.nivel.forEach(function (r, i) {
         var yc = i * fila + fila / 2;
@@ -807,11 +888,11 @@
           var v = r[q[0]] * 1000, e = r[q[1]] * 1000, yy = yc + q[2];
           el('line', { x1: x(v - 1.96 * e), x2: x(v + 1.96 * e), y1: yy, y2: yy, stroke: C.nivel, 'stroke-width': 2 }, L.g);
           var c = el('circle', { cx: x(v), cy: yy, r: 4.4, fill: q[0] === 'bajo' ? '#fff' : C.nivel, stroke: C.nivel, 'stroke-width': 2 }, L.g);
-          G.conTip(c, function () { return G.filas([[r.nivel + ': escala ' + q[3].toLowerCase()], ['Estimación', F.mil(v / 1000)], ['Intervalo de 95 %', F.mil((v - 1.96 * e) / 1000) + ' a ' + F.mil((v + 1.96 * e) / 1000)]]); });
+          G.conTip(c, function () { return G.filas([[r.nivel + ': escala ' + q[3].toLowerCase()], ['Estimación', F.mil(v / 1000)], ['Intervalo de 95' + ESP + '%', F.mil((v - 1.96 * e) / 1000) + ' a ' + F.mil((v + 1.96 * e) / 1000)]]); });
         });
       });
     });
-    G.tabla(tablaFig('f-escalas'), ['Nivel', 'σ̂<sub>j</sub>', 'Escala bajo la moda', 'Intervalo', 'Escala sobre la moda', 'Intervalo'], T.nivel.map(function (r) {
+    G.tabla(tablaFig('f-escalas'), ['Nivel', '<span class="m"><span class="hat">σ</span><sub>j</sub></span>', 'Escala bajo la moda', 'Intervalo de 95' + ESP + '%', 'Escala sobre la moda', 'Intervalo de 95' + ESP + '%'], T.nivel.map(function (r) {
       return [r.nivel, F.mil(r.sigma), F.mil(r.bajo), F.mil(r.bajo - 1.96 * r.ee_bajo) + ' a ' + F.mil(r.bajo + 1.96 * r.ee_bajo), F.mil(r.sobre), F.mil(r.sobre - 1.96 * r.ee_sobre) + ' a ' + F.mil(r.sobre + 1.96 * r.ee_sobre)];
     }));
   })();
@@ -819,14 +900,16 @@
   // ---- moda, mediana y media por nivel
   (function () {
     var cont = plot('f-medidas'), mod = 'nivel', T = E.nivel_tab;
+    // el eje cubre los dos modelos, para que no cambie al elegir el otro
+    var xmax = Math.ceil(max(T.comun.concat(T.nivel).map(function (r) { return Math.max(r.media_aj, r.media_obs) * 1000; })) * 1.02 / 50) * 50;
     segmento($('me-mod'), 'memod', [{ v: 'nivel', t: 'Escala por nivel' }, { v: 'comun', t: 'Escala común' }], mod, function (v) { mod = v; dibujar(); });
     function dibujar() {
       cont.innerHTML = '';
       var col = C[mod];
       G.claves(ley('f-medidas'), [{ tipo: 'hueco', color: col, texto: 'Moda (promedio del nivel)' }, { tipo: 'punto', color: col, texto: 'Mediana' }, { tipo: 'barra', color: col, texto: 'Media según el modelo' }, { tipo: 'rombo', color: C.obs2, texto: 'Media observada' }]);
       var fila = 36, ml = cont.clientWidth < 460 ? 118 : 138, L = G.lienzo(cont, { alto: NIV.length * fila + 44, m: { t: 8, r: 14, b: 38, l: ml } });
-      var x = G.escala(0, 2600, 0, L.w);
-      G.ejeX(L, x, { ticks: [0, 500, 1000, 1500, 2000, 2500], dec: 0, rejilla: true, titulo: 'Miles de pesos' });
+      var x = G.escala(0, xmax, 0, L.w);
+      G.ejeX(L, x, { ticks: G.ticks(0, xmax, 5), dec: 0, rejilla: true, titulo: 'Miles de pesos' });
       T[mod].forEach(function (r, i) {
         var yc = i * fila + fila / 2, moda = r.moda_media * 1000, med = (r.moda_media + r.med_err) * 1000, media = r.media_aj * 1000, obs = r.media_obs * 1000;
         tx(L.g, -10, yc + 4, r.nivel, { 'text-anchor': 'end', 'class': 'etq-2' });
@@ -848,6 +931,7 @@
   // ---- diferencias de medias
   (function () {
     var cont = plot('f-diferencias'), mod = 'nivel';
+    var xmax = Math.ceil(max(D.diferencias.map(function (d) { return Math.max(d.dif, d.coef, MCO['nivel_edu' + d.nivel].est) * 1000; })) * 1.02 / 50) * 50;
     segmento($('di-mod'), 'dimod', [{ v: 'nivel', t: 'Escala por nivel' }, { v: 'comun', t: 'Escala común' }], mod, function (v) { mod = v; dibujar(); });
     function dibujar() {
       cont.innerHTML = '';
@@ -855,8 +939,8 @@
       G.claves(ley('f-diferencias'), [{ tipo: 'barra', color: col, texto: 'Coeficiente (diferencia de modas)' }, { tipo: 'barra', color: claro, texto: 'Diferencia entre las medias del error' }, { tipo: 'rombo', color: C.mco, texto: 'Regresión normal' }]);
       var ds = D.diferencias.filter(function (d) { return d.modelo === mod; });
       var fila = 36, ml = cont.clientWidth < 460 ? 118 : 138, L = G.lienzo(cont, { alto: ds.length * fila + 50, m: { t: 14, r: 70, b: 38, l: ml } });
-      var x = G.escala(0, 2000, 0, L.w);
-      G.ejeX(L, x, { ticks: [0, 500, 1000, 1500, 2000], dec: 0, rejilla: true, titulo: 'Miles de pesos' });
+      var x = G.escala(0, xmax, 0, L.w);
+      G.ejeX(L, x, { ticks: G.ticks(0, xmax, 4), dec: 0, rejilla: true, titulo: 'Miles de pesos' });
       tx(L.g, L.w + L.m.r - 2, -2, 'Total', { 'class': 'etq-2', 'text-anchor': 'end', 'font-weight': 600 });
       ds.forEach(function (d, i) {
         var yc = i * fila + fila / 2, c = d.coef * 1000, e = d.dif_err * 1000, t = d.dif * 1000, m0 = MCO['nivel_edu' + d.nivel].est * 1000;
@@ -866,10 +950,10 @@
         el('rect', { x: x(m0) - 5, y: yc - 5, width: 10, height: 10, fill: C.mco, stroke: '#fff', 'stroke-width': 1, transform: 'rotate(45 ' + x(m0) + ' ' + yc + ')' }, L.g);
         tx(L.g, L.w + L.m.r - 2, yc + 4, F.num(t, 1), { 'class': 'etq', 'font-weight': 600, 'text-anchor': 'end' });
         var hit = el('rect', { x: 0, y: yc - fila / 2, width: L.w, height: fila, 'class': 'zona-hover' }, L.g);
-        G.conTip(hit, function () { return G.filas([[d.nivel + ' frente a básica o menos'], ['Coeficiente', F.mil(d.coef)], ['Diferencia de medias del error', F.mil(d.dif_err)], ['Diferencia de medias', F.mil(d.dif)], ['Regresión normal', F.mil(MCO['nivel_edu' + d.nivel].est)]]); });
+        G.conTip(hit, function () { return G.filas([[d.nivel + ' frente a básica o menos'], ['Coeficiente', F.mil(d.coef)], ['Diferencia de medias del error', F.mil(d.dif_err)], ['Diferencia de medias', F.mil(d.dif)], ['Intervalo de 95' + ESP + '%', F.mil(d.ic_inf) + ' a ' + F.mil(d.ic_sup)], ['Regresión normal', F.mil(MCO['nivel_edu' + d.nivel].est)]]); });
       });
-      G.tabla(tablaFig('f-diferencias'), ['Nivel', 'Coeficiente', 'Diferencia de medias del error', 'Diferencia de medias', 'Regresión normal'], ds.map(function (d) {
-        return [d.nivel, F.mil(d.coef), F.mil(d.dif_err), F.mil(d.dif), F.mil(MCO['nivel_edu' + d.nivel].est)];
+      G.tabla(tablaFig('f-diferencias'), ['Nivel', 'Coeficiente', 'Diferencia de medias del error', 'Diferencia de medias', 'Intervalo de 95' + ESP + '%', 'Regresión normal'], ds.map(function (d) {
+        return [d.nivel, F.mil(d.coef), F.mil(d.dif_err), F.mil(d.dif), F.mil(d.ic_inf) + ' a ' + F.mil(d.ic_sup), F.mil(MCO['nivel_edu' + d.nivel].est)];
       }));
     }
     G.adaptable(cont, dibujar);
@@ -878,12 +962,13 @@
   // ---- participación de cada nivel en la estimación de beta
   (function () {
     var cont = plot('f-pesobeta'), P = E.pesos_nivel;
+    var xmax = Math.ceil(max(P.comun.concat(P.nivel).filter(function (r) { return r.nivel !== 'Total'; }).map(function (r) { return r.beta; })) * 1.02 / 5) * 5;
     G.claves(ley('f-pesobeta'), [{ tipo: 'barra', color: C.comun, texto: 'Escala común' }, { tipo: 'barra', color: C.nivel, texto: 'Escala por nivel' }]);
     G.adaptable(cont, function () {
       cont.innerHTML = '';
       var fila = 34, ml = cont.clientWidth < 460 ? 118 : 150, L = G.lienzo(cont, { alto: NIV.length * fila + 44, m: { t: 6, r: 52, b: 38, l: ml } });
-      var x = G.escala(0, 60, 0, L.w);
-      G.ejeX(L, x, { ticks: L.w < 360 ? [0, 20, 40, 60] : [0, 10, 20, 30, 40, 50, 60], formato: function (v) { return v + ' %'; }, rejilla: true, titulo: 'Porcentaje de la suma de los pesos' });
+      var x = G.escala(0, xmax, 0, L.w);
+      G.ejeX(L, x, { ticks: G.ticks(0, xmax, L.w < 360 ? 3 : 6), formato: function (v) { return v + ' %'; }, rejilla: true, titulo: 'Porcentaje de la suma de los pesos' });
       NIV.forEach(function (nv, i) {
         var yc = i * fila + fila / 2;
         tx(L.g, -10, yc + 4, nv, { 'text-anchor': 'end', 'class': 'etq-2' });
@@ -895,10 +980,135 @@
         });
       });
     });
-    G.tabla(tablaFig('f-pesobeta'), ['Nivel', 'Escala común', 'Escala por nivel'], NIV.map(function (nv, i) { return [nv, F.pct(P.comun[i].beta, 2), F.pct(P.nivel[i].beta, 2)]; }));
+    // la tabla agrega la parte de los pesos de cada nivel que corresponde a quienes declaran $500.000
+    G.tabla(tablaFig('f-pesobeta'), ['Nivel', 'Escala común', 'Escala por nivel', 'En $500.000: común', 'En $500.000: por nivel'], NIVT.map(function (nv, i) {
+      return [nv === 'Total' ? 'Todos los niveles' : nv, F.pct(P.comun[i].beta, 2), F.pct(P.nivel[i].beta, 2), F.pct(P.comun[i].beta500, 1), F.pct(P.nivel[i].beta500, 1)];
+    }));
   })();
 
-  // ================================================================= 7. SUELDO SEGÚN PERFIL
+  // ================================================================= 7. ANÁLISIS DE SENSIBILIDAD
+  (function () {
+    var S = D.sensibilidad, EST = S.est, orden = F.num(S.orden, 3);
+    // estimaciones que se comparan: clave en los datos, nombre y nombre corto
+    var AN = [['final', 'Modelo final', 'Modelo final'], ['angostos', 'Sueldos como intervalos angostos', 'Intervalos angostos'],
+      ['amplios', 'Sueldos como intervalos amplios', 'Intervalos amplios'], ['cuantil', 'Regresión por cuantiles de orden ' + orden, 'Cuantil ' + orden],
+      ['ponderado', 'Ponderado por el factor de expansión', 'Ponderado'], ['escala', 'Escala por nivel, sexo y tamaño', 'Escala ampliada'],
+      ['asimetria', 'Asimetría por nivel', 'Asimetría por nivel']];
+    function tiene(k, p) { return EST[k][p] !== undefined && EST[k][p] !== null; }
+
+    // ---- un coeficiente en las siete estimaciones
+    var cont = plot('f-sens'), sel = $('sens-par'), par = 'nivel_eduProfesional completo';
+    function opcion(b) { return '<option value="' + b[0] + '">' + b[1] + '</option>'; }
+    sel.innerHTML = '<optgroup label="Nivel educacional (respecto de básica o menos)">' + BETAS.slice(1, 7).map(opcion).join('') + '</optgroup>' +
+      '<optgroup label="Sexo y tamaño de empresa (respecto de mujer y microempresa)">' + BETAS.slice(9, 13).map(opcion).join('') + '</optgroup>' +
+      '<optgroup label="Edad y horas">' + BETAS.slice(7, 9).map(opcion).join('') + '</optgroup>';
+    sel.value = par;
+    function dibujar() {
+      cont.innerHTML = '';
+      var pesos = par === 'edad' || par === 'horas_trab', esc = pesos ? 1e6 : 1000, dec = pesos ? 0 : 1;
+      var vals = AN.map(function (a) { return EST[a[0]][par] * esc; });
+      var ic = [(EST.final[par] - 1.96 * EST.ee_c[par]) * esc, (EST.final[par] + 1.96 * EST.ee_c[par]) * esc];
+      var angosto = cont.clientWidth < 560, fila = 34, ml = angosto ? 128 : 262;
+      var L = G.lienzo(cont, { alto: AN.length * fila + 62, m: { t: 22, r: 66, b: 40, l: ml } });
+      var x = G.escala(Math.min(0, min(vals)), max(vals.concat(ic)) * 1.04, 0, L.w);
+      G.ejeX(L, x, { n: Math.max(3, Math.round(L.w / 110)), rejilla: true, titulo: pesos ? 'Pesos' : 'Miles de pesos', formato: function (v) { return F.num(v, 0); } });
+      tx(L.g, L.w + L.m.r - 2, -8, 'Estimación', { 'class': 'etq-2', 'text-anchor': 'end', 'font-weight': 600 });
+      el('rect', { x: x(ic[0]), y: 0, width: Math.max(1.5, x(ic[1]) - x(ic[0])), height: L.h, fill: C.nivel, 'fill-opacity': 0.2 }, L.g);
+      el('line', { x1: x(vals[0]), x2: x(vals[0]), y1: 0, y2: L.h, stroke: C.nivel, 'stroke-width': 1.2 }, L.g);
+      AN.forEach(function (a, i) {
+        var yc = i * fila + fila / 2, v = vals[i], fin = i === 0, hueco = a[0] === 'asimetria', col = fin ? C.nivel : C.mco;
+        tx(L.g, -10, yc + 4, angosto ? a[2] : a[1], { 'text-anchor': 'end', 'class': 'etq-2', 'font-weight': fin ? 600 : null });
+        el('line', { x1: 0, x2: L.w, y1: yc, y2: yc, stroke: '#eef0f3' }, L.g);
+        var c = el('circle', { cx: x(v), cy: yc, r: fin ? 5.6 : 4.8, fill: hueco ? '#fff' : col, stroke: col, 'stroke-width': 2 }, L.g);
+        tx(L.g, L.w + L.m.r - 2, yc + 4, F.num(v, dec), { 'class': 'etq', 'text-anchor': 'end', 'font-weight': fin ? 600 : 400 });
+        G.conTip(c, function () {
+          var d = S.dif_ee[a[0]], nombre = BETAS.filter(function (b) { return b[0] === par; })[0][1];
+          return G.filas([[a[1]], [nombre, (pesos ? '$' : '') + F.num(v, dec) + (pesos ? '' : ESP + 'mil')],
+            fin ? ['Intervalo de 95' + ESP + '%', F.num(ic[0], dec) + ' a ' + F.num(ic[1], dec)] : ['Diferencia con el modelo final', F.num(v - vals[0], dec)],
+            d && d[par] !== undefined ? ['Diferencia en errores estándar', F.num(d[par], 2)] : null]);
+        });
+      });
+    }
+    sel.addEventListener('change', function () { par = sel.value; dibujar(); });
+    G.adaptable(cont, dibujar);
+
+    // ---- tabla de todos los coeficientes
+    (function () {
+      function mil(v) { return F.num(v * 1000, Math.abs(v) < 0.01 ? 2 : 1); }
+      function celda(k, p, fmt) { return tiene(k, p) ? fmt(EST[k][p]) : ''; }
+      var f3 = function (v) { return F.num(v, 3); }, claves = AN.map(function (a) { return a[0]; });
+      var filasT = [['Coeficientes (miles de pesos)']], clases = ['grupo'];
+      BETAS.forEach(function (b) {
+        filasT.push([b[1], mil(EST.final[b[0]]) + ' (' + mil(EST.ee_c[b[0]]) + ')'].concat(claves.slice(1).map(function (k) { return celda(k, b[0], mil); }))); clases.push('');
+      });
+      filasT.push(['Parámetros del error']); clases.push('grupo');
+      [['alpha', GR.alpha], ['nu', GR.nu]].forEach(function (p) {
+        filasT.push([p[1], f3(EST.final[p[0]]) + ' (' + f3(EST.ee_c[p[0]]) + ')'].concat(claves.slice(1).map(function (k) {
+          return p[0] === 'alpha' && k === 'asimetria' ? 'una por nivel' : celda(k, p[0], f3);
+        }))); clases.push('');
+      });
+      G.tabla(tablaFig('f-sens'), ['Parámetro', 'Modelo final (EE<sub>C</sub>)'].concat(AN.slice(1).map(function (a) { return a[2]; })), filasT, { clase: function (k) { return clases[k]; } });
+    })();
+
+    // ---- sueldos como intervalos: el modelo con escala por nivel en cada tratamiento del sueldo
+    (function () {
+      var TR = { exacto: 'Sueldo como valor exacto', angostos: 'Intervalos angostos', amplios: 'Intervalos amplios' }, cont = $('t-sens-int');
+      G.tabla(cont, ['Tratamiento del sueldo', GR.alphaE, GR.nuE, 'Diferencia de BIC', '% del aumento en $500.000'],
+        S.intervalos.filter(function (r) { return r.modelo === 'nivel'; }).map(function (r) {
+          return [TR[r.trat], F.num(r.alpha, 3), F.num(r.nu, 3), F.num(r.dbic, 2), F.num(r.pct500, 1)];
+        }));
+      cont.classList.add('pares');
+      cont.insertAdjacentHTML('beforeend', '<p class="fig-nota">Modelo con escala por nivel. Diferencia de BIC: respecto del modelo con escala común estimado con el mismo tratamiento del sueldo. Última columna: porcentaje del aumento de la log-verosimilitud que proviene de quienes declaran $500.000.</p>');
+    })();
+
+    // ---- escalas con y sin ponderar
+    (function () {
+      var m1 = function (v) { return F.num(v * 1000, 1); };
+      G.tabla($('t-sens-pond'), ['Nivel', 'Bajo la moda: sin ponderar', 'Bajo la moda: ponderada', 'Sobre la moda: sin ponderar', 'Sobre la moda: ponderada'], S.escalas_pond.map(function (r) {
+        return [r.nivel, m1(r.bajo), m1(r.bajo_pond), m1(r.sobre), m1(r.sobre_pond)];
+      }));
+      $('t-sens-pond').classList.add('pares');
+      $('t-sens-pond').insertAdjacentHTML('beforeend', '<p class="fig-nota">Escalas del error en miles de pesos.</p>');
+    })();
+
+    // ---- variantes del modelo
+    (function () {
+      var V = S.variantes, filasT = [], clases = [];
+      function fila(nombre, vals, cls) { filasT.push([nombre].concat(vals)); clases.push(cls || ''); }
+      fila('Parámetros <i>m</i>', V.map(function (v) { return v.m; }));
+      fila('Log-verosimilitud ℓ', V.map(function (v) { return F.num(v.loglik, 2); }));
+      fila('BIC', V.map(function (v) { return F.num(v.bic, 2); }));
+      fila(GR.nuE, V.map(function (v) { return F.num(v.nu, 3); }));
+      fila(GR.alphaE + ' común', [F.num(EST.final.alpha, 3), '', F.num(EST.escala.alpha, 3)]);
+      fila('Asimetría por nivel: <span class="m"><span class="hat">α</span><sub>j</sub></span> y orden del cuantil que describe la función de regresión', [], 'grupo');
+      S.forma.forEach(function (r) { fila(r.nivel, ['', F.num(r.alpha, 3) + ' (' + F.num(r.orden, 3) + ')', '']); });
+      fila('Factores de la escala (respecto de mujer y microempresa)', [], 'grupo');
+      BETAS.slice(9, 13).forEach(function (b) { fila(b[1], ['', '', F.num(EST.escala['Factor de escala [' + b[0] + ']'], 3)]); });
+      G.tabla($('t-sens-var'), ['', V[0].modelo, V[1].modelo, V[2].modelo], filasT, { clase: function (k) { return clases[k]; } });
+    })();
+
+    // ---- simulación
+    (function () {
+      var Sm = S.simulacion, ESC = { continuo: 'Modelo', redondeado: 'Redondeo', acumulado: 'Redondeo y acumulación' };
+      // un escenario por columna, para que la tabla quepa en el panel
+      var Es = Sm.escenarios;
+      G.tabla($('t-sim'), [''].concat(Es.map(function (e) { return ESC[e.escenario]; })), [
+        ['% de sueldos en $500.000'].concat(Es.map(function (e) { return F.num(e.pct500, 1); })),
+        ['Mayor sesgo relativo, en valor absoluto (%)'].concat(Es.map(function (e) { return F.num(e.sesgo_max, 2); })),
+        ['Menor cobertura (%)'].concat(Es.map(function (e) { return F.num(e.cob_min, 1); })),
+        ['Mayor cobertura (%)'].concat(Es.map(function (e) { return F.num(e.cob_max, 1); }))]);
+      $('t-sim').classList.add('pares');
+      var P = {}; Sm.par.forEach(function (r) { (P[r.par] = P[r.par] || {})[r.escenario] = r; });
+      var pars = BETAS.concat(NIV.map(function (nv) { return ['sigma2 [' + nv + ']', GR.sigma2 + ': ' + nv.toLowerCase()]; }), [['alpha', GR.alpha], ['nu', GR.nu]]);
+      G.tabla($('t-sim-par'), ['Parámetro', 'Modelo: sesgo (%)', 'Modelo: cobertura (%)', 'Redondeo: sesgo (%)', 'Redondeo: cobertura (%)', 'Redondeo y acumulación: sesgo (%)', 'Redondeo y acumulación: cobertura (%)'],
+        pars.map(function (p) {
+          var r = P[p[0]];
+          return [p[1]].concat(['continuo', 'redondeado', 'acumulado'].reduce(function (a, e) { return a.concat([F.num(r[e].sesgo_pct, 2), F.num(r[e].cob, 1)]); }, []));
+        }));
+    })();
+  })();
+
+  // ================================================================= 8. SUELDO SEGÚN PERFIL
   (function () {
     var mod = 'nivel', comparar = false, monto = 1000000;
     var perfiles = [{ nivel: 'Media completa', sexo: 'Mujer', tam: 'Grande (200 o más)', edad: 35, horas: 44 },
@@ -908,7 +1118,7 @@
     segmento($('pf-mod'), 'pfmod', OPS, mod, function (v) { mod = v; calcular(); });
     function construir(k) {
       var cont = $(k === 0 ? 'perfil-a' : 'perfil-b'), p = perfiles[k], id = 'pf' + k;
-      cont.innerHTML = '<h4>' + etiquetas[k] + '</h4>' +
+      cont.innerHTML = '<h3>' + etiquetas[k] + '</h3>' +
         '<label class="campo"><span>Nivel educacional</span><select id="' + id + '-niv">' + NIV.map(function (n) { return '<option>' + n + '</option>'; }).join('') + '</select></label>' +
         '<div class="campo"><span id="' + id + '-sx-r">Sexo</span><div class="segmento" role="radiogroup" aria-labelledby="' + id + '-sx-r" id="' + id + '-sx"></div></div>' +
         '<label class="campo"><span>Tamaño de empresa</span><select id="' + id + '-tam">' + TAM.map(function (t) { return '<option>' + t + '</option>'; }).join('') + '</select></label>' +
@@ -949,6 +1159,14 @@
         return '<th><i class="mk" style="border-top:3px ' + (k === 0 ? 'solid' : 'dashed') + ' ' + col + '"></i>' + etiquetas[k] + '</th>';
       }).join('') + '</tr></thead><tbody>' + filasR.map(function (f) { return '<tr><td>' + f[0] + '</td>' + ds.map(function (d) { return '<td class="v">' + f[1](d) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>';
       $('pf-monto-r').innerHTML = ds.map(function (d, k) { return etiquetas[k] + ': <b>' + F.pct(100 * d.sup(monto / 1e6)) + '</b>'; }).join('&emsp;');
+      // la regresión normal puede dar cuantiles negativos: se dice cuánta probabilidad asigna a sueldos negativos
+      var neg = $('pf-negativo'), pn = ds.map(function (d) { return 100 * (1 - d.sup(0)); });
+      neg.hidden = !(mod === 'mco' && max(pn) >= 0.05);
+      if (!neg.hidden) {
+        neg.textContent = 'Con la regresión normal, la distribución ' + (ds.length === 1 ? 'de este perfil asigna una probabilidad de ' + F.pct(pn[0])
+          : 'de estos perfiles asigna una probabilidad de ' + F.pct(pn[0]) + ' (perfil A) y de ' + F.pct(pn[1]) + ' (perfil B)') +
+          ' a sueldos negativos: el error normal es simétrico, de modo que deja tanta probabilidad bajo la media como sobre ella.';
+      }
       G.claves(ley('f-perfil'), ds.map(function (d, k) { return { tipo: k === 0 ? 'linea' : 'discontinua', color: col, texto: etiquetas[k] }; }));
       dibujarDens(ds, col);
     }
